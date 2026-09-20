@@ -178,6 +178,13 @@ h4 { font-size: var(--step-0); font-weight: 600; }
   margin-top: var(--sp-8);
   padding-top: var(--sp-4);
   border-top: 1px solid var(--border);
+  scroll-margin-top: 88px;
+}
+/* A section already supplies its own leading space and boundary. */
+.prose > h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 .prose h3 { margin-top: var(--sp-6); }
 .prose h4 { margin-top: var(--sp-5); color: var(--accent); }
@@ -805,6 +812,53 @@ td code { white-space: nowrap; }
 
 main { display: block; }
 .section { padding-top: var(--sp-8); }
+
+/* Long pages get a persistent contents rail in the space the 66ch
+   measure leaves empty. The aside comes first in the DOM so that it
+   reads at the top on a phone, and is placed right on wide screens. */
+.withaside { display: block; }
+.withaside__nav { margin-bottom: var(--sp-6); }
+@media (min-width: 1180px) {
+  .withaside {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 216px;
+    column-gap: var(--sp-8);
+    align-items: start;
+  }
+  .withaside__main { grid-column: 1; grid-row: 1; }
+  .withaside__nav {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 76px;
+    margin-bottom: 0;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+}
+
+/* Contents rail */
+.rail { border-left: 1px solid var(--border); padding-left: var(--sp-4); }
+.rail h2 {
+  font-size: var(--micro);
+  color: var(--text-dim);
+  font-weight: 400;
+  margin: 0 0 var(--sp-3);
+  border: 0;
+  padding: 0;
+}
+.rail ol { list-style: none; padding: 0; margin: 0; counter-reset: rail; display: grid; gap: var(--sp-1); }
+.rail li { counter-increment: rail; font-size: var(--micro); line-height: 1.5; }
+.rail a {
+  display: block;
+  padding: 3px 0;
+  text-decoration: none;
+  color: var(--text-dim);
+}
+.rail a::before { content: counter(rail, decimal-leading-zero) "  "; color: var(--graph); }
+.rail a:hover { color: var(--accent); background: none; }
+.rail a[aria-current="true"] { color: var(--accent); }
+.rail a[aria-current="true"]::before { color: var(--accent); }
 
 /* --------------------------------------------------------------------------
    20. Motion + print
