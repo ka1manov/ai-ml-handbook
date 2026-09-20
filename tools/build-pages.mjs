@@ -105,6 +105,7 @@ ${m.readbar === 'yes' ? '<div class="readbar-track"><div class="readbar" data-re
 ${NAV.map(([h, l]) => `      <a href="${m.base}${h}">${l}</a>`).join('\n')}
     </nav>
     <div class="topbar__tools">
+      <a class="btn btn--follow" href="https://x.com/ka1manov" rel="me noopener" target="_blank">[ @ka1manov ]</a>
       <button class="btn" type="button" data-search-open aria-label="Search the handbook">[ / ]</button>
       <button class="btn" type="button" data-theme-toggle>[ crt ]</button>
       <button class="btn" type="button" data-nav-toggle>[ menu ]</button>
@@ -113,6 +114,7 @@ ${NAV.map(([h, l]) => `      <a href="${m.base}${h}">${l}</a>`).join('\n')}
   <div class="shell">
     <nav class="navmenu" id="navmenu" aria-label="Sections, compact" hidden>
 ${NAV.map(([h, l]) => `      <a href="${m.base}${h}">${l}</a>`).join('\n')}
+      <a class="navmenu__follow" href="https://x.com/ka1manov" rel="me noopener" target="_blank">follow @ka1manov on X →</a>
     </nav>
   </div>
 </header>

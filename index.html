@@ -46,6 +46,7 @@
       <a href="./articles/index.html">articles</a>
     </nav>
     <div class="topbar__tools">
+      <a class="btn btn--follow" href="https://x.com/ka1manov" rel="me noopener" target="_blank">[ @ka1manov ]</a>
       <button class="btn" type="button" data-search-open aria-label="Search the handbook">[ / ]</button>
       <button class="btn" type="button" data-theme-toggle>[ crt ]</button>
       <button class="btn" type="button" data-nav-toggle>[ menu ]</button>
@@ -60,6 +61,7 @@
       <a href="./calculators.html">calculators</a>
       <a href="./tips.html">field-notes</a>
       <a href="./articles/index.html">articles</a>
+      <a class="navmenu__follow" href="https://x.com/ka1manov" rel="me noopener" target="_blank">follow @ka1manov on X →</a>
     </nav>
   </div>
 </header>
@@ -85,6 +87,210 @@
       <div class="log__row"><span class="log__t">[00:00:01]</span><span class="log__lvl">also</span><span class="log__msg"><a href="rag.html">rag deep dive</a>, <a href="interview.html">122 interview questions</a>, <a href="startups.html">startup playbook</a>, <a href="tips.html">50 field notes</a>, <a href="articles/index.html">6 long reads</a></span></div>
       <div class="log__row"><span class="log__t">[00:00:02]</span><span class="log__lvl log__lvl--ok">ready</span><span class="log__msg">serving on this page<span class="cursor" aria-hidden="true"></span></span></div>
     </div>
+  </div>
+</section>
+
+<section class="router" data-router style="margin-top:var(--sp-7)">
+  <div class="win__bar">
+    <span class="win__dots">[_][□][X]</span>
+    <span class="win__title">start here — 57k words is a lot, so here is the order</span>
+  </div>
+  <div class="router__body">
+    <p class="router__q"><b>Who are you right now?</b></p>
+
+    <div class="router__roles" role="group" aria-label="Choose your starting point">
+      <button class="router__role" type="button" data-role="levelling" aria-pressed="true">
+        <b>Levelling up</b>
+        <span>I can train a model, I want production</span>
+      </button>
+      <button class="router__role" type="button" data-role="interview" aria-pressed="false">
+        <b>Interviewing</b>
+        <span>I have a loop coming up</span>
+      </button>
+      <button class="router__role" type="button" data-role="founder" aria-pressed="false">
+        <b>Founder or CTO</b>
+        <span>deciding what to build</span>
+      </button>
+      <button class="router__role" type="button" data-role="browsing" aria-pressed="false">
+        <b>Just browsing</b>
+        <span>show me the good parts</span>
+      </button>
+    </div>
+
+    <!-- ===== levelling up ===== -->
+    <div class="path" data-path="levelling">
+      <h3 data-path-heading>If you are levelling up</h3>
+      <p class="path__lede">The shortest route from "I can train a model" to "I am trusted with the thing that pages at 3am." <b>Start with the gap audit</b> — it tells you which of the rest you actually need.</p>
+      <ol class="path__steps">
+        <li class="path__step">
+          <div>
+            <h4><a href="#roadmap">Audit yourself against the roadmap</a></h4>
+            <p>Do not read it. Scan only the <i>prove it</i> line of all 42 nodes and tick what you could produce this afternoon. Whatever you cannot is your actual curriculum. <span class="t">~15 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="rag.html">RAG systems, properly</a></h4>
+            <p>The most common production LLM architecture and the most commonly built badly. Read the failure-mode taxonomy even if you skim the rest. <span class="t">~35 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/evaluation.html">Evaluation engineering</a></h4>
+            <p>The single practice that separates engineers who improve systems from engineers who change them. Highest leverage thing on this whole site. <span class="t">~15 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/inference.html">Inference economics</a></h4>
+            <p>Where the money actually goes, and which optimisation moves which metric. Then put your own numbers into the <a href="calculators.html#vram">memory calculator</a>. <span class="t">~20 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="tips.html">50 field notes</a></h4>
+            <p>Concentrated. Read them in one sitting; a handful will describe a mistake you are currently making. <span class="t">~12 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4>Then go work your gaps</h4>
+            <p>Back to the roadmap, with the ticks you made in step one. Build the artifacts, not the reading list. <span class="t">ongoing</span></p>
+          </div>
+        </li>
+      </ol>
+      <p class="path__total"><b>~1h 40m of reading</b>, then the work. Your ticks save in this browser, so you can stop and come back.</p>
+    </div>
+
+    <!-- ===== interviewing ===== -->
+    <div class="path" data-path="interview" hidden>
+      <h3 data-path-heading>If you are interviewing</h3>
+      <p class="path__lede">Assumes a loop in roughly two weeks. <b>Do step one first</b> — knowing what you cannot answer changes what is worth reading.</p>
+      <ol class="path__steps">
+        <li class="path__step">
+          <div>
+            <h4><a href="interview.html">Run the question bank cold</a></h4>
+            <p>Filter to your level, hide nothing, and answer out loud before revealing. Mark the ones you got. The unmarked set is your study list. <span class="t">~45 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="rag.html">RAG systems, properly</a></h4>
+            <p>This is where senior interviews separate people. Most candidates can define RAG; very few can say which half is broken and how they would find out. <span class="t">~35 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/evaluation.html">Evaluation engineering</a></h4>
+            <p>"How would you know it works?" is asked in some form in nearly every loop, and it is the question most candidates answer weakly. <span class="t">~15 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/transformers.html">Transformer internals</a></h4>
+            <p>For the mechanism questions: why scale by √d, what the KV cache costs, why context is quadratic. Answer these from the mechanism, not from memory. <span class="t">~16 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="interview.html#system-design">ML system design</a></h4>
+            <p>14 worked designs. Read how each one opens — the requirement-gathering before any architecture is the part being assessed. <span class="t">~20 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="interview.html">Drill: shuffle, hide known, repeat</a></h4>
+            <p>Shuffle so you cannot pattern-match on order. Do this daily until the unmarked list is empty. <span class="t">15 min/day</span></p>
+          </div>
+        </li>
+      </ol>
+      <p class="path__total"><b>~2h 10m</b>, then daily drilling. Your marks save in this browser.</p>
+    </div>
+
+    <!-- ===== founder ===== -->
+    <div class="path" data-path="founder" hidden>
+      <h3 data-path-heading>If you are a founder or CTO</h3>
+      <p class="path__lede">Written to help you decide what to build, what to buy, and what it costs. <b>You can skip the entire roadmap</b> — come back to it when you are hiring and need to know what to test for.</p>
+      <ol class="path__steps">
+        <li class="path__step">
+          <div>
+            <h4><a href="startups.html">The startup playbook</a></h4>
+            <p>Build/buy/fine-tune, the 0→1 ladder, why "we use an LLM" is not a moat, and how AI startups actually fail. The one thing to read if you read one thing. <span class="t">~25 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="calculators.html#cost">Put your numbers in the cost calculator</a></h4>
+            <p>Cost per <i>successful outcome</i>, not per request. Do this before you price anything — several founders discover here that their unit economics are upside down. <span class="t">~5 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="rag.html#what">When RAG is the wrong tool</a></h4>
+            <p>Just that one section. The most expensive AI mistakes are building retrieval for a problem that was never a retrieval problem. <span class="t">~5 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/finetuning.html">Fine-tuning: a guide to not doing it</a></h4>
+            <p>Read this before anyone on your team proposes a fine-tune. Fine-tuning teaches form; retrieval supplies facts, and confusing them burns quarters. <span class="t">~15 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/evaluation.html">Evaluation engineering</a></h4>
+            <p>Not so you build it — so you know to demand it. A team shipping LLM features without an eval suite is guessing, and you are paying for the guesses. <span class="t">~15 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="startups.html#plan">The 90-day plan</a></h4>
+            <p>Take it, adjust the dates, keep the order. Each phase depends on the one before it. <span class="t">~5 min</span></p>
+          </div>
+        </li>
+      </ol>
+      <p class="path__total"><b>~1h 10m.</b> The playbook and the cost calculator alone are worth the first 30 minutes.</p>
+    </div>
+
+    <!-- ===== browsing ===== -->
+    <div class="path" data-path="browsing" hidden>
+      <h3 data-path-heading>If you are just browsing</h3>
+      <p class="path__lede">The parts people send to each other. <b>No particular order</b> — pick whichever title sounds like a problem you have had.</p>
+      <ol class="path__steps">
+        <li class="path__step">
+          <div>
+            <h4><a href="rag.html#failures">The RAG failure-mode taxonomy</a></h4>
+            <p>Symptom, cause, the diagnostic that distinguishes it, and the fix. Twelve rows. The most-used thing here. <span class="t">~8 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="articles/agents.html#arithmetic">Why agents fail</a></h4>
+            <p>Per-step success raised to the number of steps. 95% over ten steps is 60%. That one line explains the whole demo-to-product gap. <span class="t">~4 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="calculators.html">The calculators</a></h4>
+            <p>Change KV heads from 32 to 8 and watch the cache collapse. Drop success from 85% to 60% and watch cost climb. Faster than reading about it. <span class="t">~5 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="tips.html">50 field notes</a></h4>
+            <p>One claim each, plus the reason it is true. Designed to be skimmed and argued with. <span class="t">~12 min</span></p>
+          </div>
+        </li>
+        <li class="path__step">
+          <div>
+            <h4><a href="interview.html">A few interview questions</a></h4>
+            <p>Even if you are not interviewing. The weak-versus-strong answer contrasts are a decent mirror. <span class="t">~10 min</span></p>
+          </div>
+        </li>
+      </ol>
+      <p class="path__total"><b>~40 min</b> for the highlights. Press <span class="kbd">/</span> any time to search all 57k words.</p>
+    </div>
+
   </div>
 </section>
 
@@ -760,5 +966,6 @@
 <script src="./assets/js/nav.js" defer></script>
 <script src="./assets/js/search.js" defer></script>
 <script src="./assets/js/progress.js" defer></script>
+<script src="./assets/js/router.js" defer></script>
 </body>
 </html>

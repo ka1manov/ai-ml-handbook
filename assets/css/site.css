@@ -426,7 +426,9 @@ td code { white-space: nowrap; }
 .topbar__by { display: none; }
 .topbar__brand-long { display: none; }
 @media (min-width: 560px) { .topbar__brand-long { display: inline; } }
-@media (min-width: 720px) {
+/* Shown only in the band where there is room: after the brand can afford
+   it, and before the full nav claims the space. */
+@media (min-width: 720px) and (max-width: 999px) {
   .topbar__by {
     display: inline;
     font-size: var(--micro);
@@ -447,7 +449,8 @@ td code { white-space: nowrap; }
 .topbar__tools { display: flex; gap: var(--sp-2); margin-left: auto; }
 @media (min-width: 1000px) {
   .topbar__links { display: flex; }
-  .topbar__tools { margin-left: var(--sp-5); }
+  .topbar__tools { margin-left: var(--sp-5); flex: none; }
+  .topbar__inner { flex-wrap: nowrap; }
 }
 
 .btn {
@@ -463,6 +466,33 @@ td code { white-space: nowrap; }
 }
 .btn:hover { color: var(--accent); border-color: var(--border-strong); }
 .btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+/* The one filled control on the page — it is the single thing being asked for. */
+.btn--follow {
+  display: none;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+.btn--follow:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+/* Above this width the follow button replaces the byline — they link to
+   the same place, and keeping both wraps the bar onto two rows. */
+@media (min-width: 1200px) {
+  .btn--follow { display: inline-block; }
+  /* One row, guaranteed: the nav's auto margin absorbs the line's free
+     space, which otherwise pushes the tools onto a second row. */
+  .topbar__inner { flex-wrap: nowrap; }
+  .topbar__links { min-width: 0; overflow: hidden; }
+  .topbar__tools { flex: none; }
+}
+
+.navmenu__follow {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3) !important;
+  border-top: 1px solid var(--border);
+  color: var(--accent) !important;
+}
 
 .navmenu {
   display: grid;
@@ -787,6 +817,83 @@ td code { white-space: nowrap; }
 .tip__n { flex: none; color: var(--text-dim); font-size: var(--step--1); width: 3ch; }
 .tip__body { min-width: 0; max-width: 66ch; font-size: var(--step-body); line-height: 1.8; }
 .tip__body b { display: block; color: var(--text); font-size: var(--step-0); margin-bottom: var(--sp-2); }
+
+/* --------------------------------------------------------------------------
+   17a. Start-here router
+   -------------------------------------------------------------------------- */
+.router { border: 1px solid var(--border); background: var(--bg-raised); }
+.router__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-inset);
+  font-size: var(--micro); color: var(--text-dim);
+}
+.router__head b { color: var(--accent); font-weight: 400; }
+.router__body { padding: var(--sp-5); }
+@media (min-width: 720px) { .router__body { padding: var(--sp-6); } }
+
+.router__q { font-size: var(--step-0); margin-bottom: var(--sp-4); }
+.router__roles { display: grid; gap: var(--sp-2); }
+@media (min-width: 640px) { .router__roles { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .router__roles { grid-template-columns: repeat(4, 1fr); } }
+
+.router__role {
+  text-align: left;
+  font-family: var(--font-mono);
+  color: var(--text);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  padding: var(--sp-3) var(--sp-4);
+  cursor: pointer;
+  line-height: 1.5;
+}
+.router__role:hover { border-color: var(--graph); }
+.router__role[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.router__role b { display: block; font-size: var(--step--1); font-weight: 600; }
+.router__role[aria-pressed="true"] b { color: var(--accent); }
+.router__role span { display: block; font-size: var(--micro); color: var(--text-dim); margin-top: 2px; }
+
+.path { margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--border); }
+.path__lede { font-size: var(--step-body); color: var(--text); max-width: var(--measure); margin-bottom: var(--sp-5); }
+.path__lede b { color: var(--accent); font-weight: 600; }
+
+.path__steps { list-style: none; padding: 0; margin: 0; counter-reset: step; }
+.path__step {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 2.6ch 1fr;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border);
+  max-width: var(--measure);
+}
+.path__step:last-child { border-bottom: 0; }
+.path__step::before {
+  content: counter(step, decimal-leading-zero);
+  color: var(--graph);
+  font-size: var(--micro);
+  padding-top: 3px;
+}
+.path__step h4 { font-size: var(--step--1); font-weight: 600; margin: 0; color: var(--text); }
+.path__step h4 a { text-decoration: none; }
+.path__step h4 a:hover { text-decoration: underline; background: none; }
+.path__step p { margin-top: 3px; font-size: var(--micro); color: var(--text-dim); line-height: 1.65; }
+.path__step .t { color: var(--accent); }
+
+.path__total {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--graph);
+  font-size: var(--micro);
+  color: var(--text-dim);
+  max-width: var(--measure);
+}
+.path__total b { color: var(--text); font-weight: 400; }
 
 /* --------------------------------------------------------------------------
    17b. Calculators — inputs left, live readout right
