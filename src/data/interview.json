@@ -1,0 +1,734 @@
+[
+ {
+  "track": "fundamentals",
+  "level": "junior",
+  "q": "Explain the bias\u2013variance trade-off without using the words bias or variance.",
+  "a": "\nA model can be wrong in two different ways. It can be too simple to capture the real pattern, so it makes the same mistake on every dataset you give it \u2014 consistently wrong in the same direction. Or it can be flexible enough to chase the noise in whatever data it happened to see, so it does brilliantly on that data and differently badly on the next batch.\n\nYou cannot minimise both freely. Making the model more flexible reduces the first error and increases the second. The useful question in practice is which one you currently have, and the diagnostic is the gap between training and validation performance: bad at both means too simple, great at training and bad at validation means it memorised.\n\nSTRONG: mentions that this framing is about expected error over resampled datasets, and notes that modern overparameterised networks complicate the classic U-shaped curve \u2014 they can interpolate the training data and still generalise.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "junior",
+  "q": "What is regularisation and why does it work?",
+  "a": "\nAny constraint you add that makes the model prefer simpler explanations. L2 shrinks weights toward zero proportionally, keeping them small and spread out. L1 pushes some weights exactly to zero, which performs feature selection as a side effect. Dropout, early stopping, data augmentation and weight sharing are all regularisation too, even though they do not look like a penalty term.\n\nIt works because it reduces the effective capacity of the model \u2014 the space of functions it can express \u2014 so it has less freedom to fit noise. The Bayesian reading is also worth having: an L2 penalty is exactly a Gaussian prior on the weights, and L1 is a Laplace prior.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "When would you prefer L1 over L2 regularisation?",
+  "a": "\nWhen you want sparsity \u2014 either because you believe most features are genuinely irrelevant, or because you need a smaller model to serve, or because you want an interpretable set of selected features.\n\nThe mechanism is geometric: the L1 constraint region has corners on the axes, and the optimum tends to land on a corner, which means a coefficient of exactly zero. The L2 region is a smooth ball, so the optimum lands off-axis and coefficients shrink toward zero without reaching it.\n\nL1 has a real weakness worth naming: with a group of correlated features it tends to pick one arbitrarily and zero the rest, which makes the selection unstable across resamples. If you care about which features were selected, that instability matters. Elastic net exists precisely to fix it.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "Your model has 99% accuracy. Should you be happy?",
+  "a": "\nNot until I know the class balance. If 99% of the labels are the negative class, a model that always predicts negative scores 99% and is worth nothing. Accuracy is close to useless under imbalance.\n\nI would want the confusion matrix, then precision and recall for the minority class, then PR-AUC rather than ROC-AUC \u2014 ROC-AUC looks flattering under heavy imbalance because the false-positive rate barely moves when negatives dominate the denominator.\n\nThen I would ask what the errors cost. A false negative in fraud detection and a false positive in fraud detection have very different prices, and the threshold should be set from that, not left at 0.5.\n\nWEAK: \"It might be overfitting.\"\n\nSTRONG: asks for the base rate before saying anything else, then connects the metric choice to the cost of each error type.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "What is data leakage? Give three ways it happens that are easy to miss.",
+  "a": "\nInformation reaching the model at training time that will not be available at prediction time. It inflates offline scores and the gain evaporates in production.\n\nFirst, preprocessing fit on the full dataset before splitting \u2014 scalers, imputers, target encoders, feature selection. The statistics carry information from validation into training. Fit inside the fold, always.\n\nSecond, temporal leakage: any feature computed using data from after the prediction timestamp. \"Customer's total lifetime spend\" in a churn model is a classic, because it includes spend that happened after the churn event.\n\nThird, group leakage: the same entity appearing in train and test under different rows \u2014 the same patient, the same user, the same document in a near-duplicate form. Random splitting is wrong whenever rows are not independent; you need grouped splits.\n\nSTRONG: mentions that the tell is an offline number that looks too good, and that the discipline is to be suspicious of your own good results rather than to enjoy them.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "senior",
+  "q": "How do you know whether a 0.4-point metric improvement is real?",
+  "a": "\nI do not, from the point estimate alone. I need the uncertainty.\n\nThe practical procedure is bootstrap: resample the test set with replacement a few thousand times, compute the metric difference between the two models on each resample, and look at the distribution of that difference. If the interval straddles zero, the improvement is not established. Crucially, compute the difference per resample rather than two separate intervals \u2014 the models are evaluated on the same data, so their errors are correlated, and paired comparison has much more power.\n\nThen I would ask two more questions. Is the test set large enough that a 0.4-point difference is detectable at all? And how many variants were tried before this one won? If it is the best of forty, I expect the winner to be optimistically biased by selection, and I want a held-out confirmation set that was not used in the search.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "Explain precision and recall to a product manager, and explain the trade-off.",
+  "a": "\nOf the things we flagged, what fraction were actually right \u2014 that is precision. Of the things we should have flagged, what fraction did we catch \u2014 that is recall.\n\nThey trade against each other because both are governed by the same threshold. Flag more aggressively and you catch more of the real cases while also flagging more innocent ones. Flag conservatively and the things you flag are almost all right, but you miss more.\n\nThe product decision is which error hurts more. A spam filter that moves a real invoice to junk has done more damage than one that lets a spam email through, so you want precision. A screening test where a missed case is fatal wants recall, and accepts that humans will review the false positives.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "senior",
+  "q": "What is model calibration and when does it matter more than accuracy?",
+  "a": "\nA model is calibrated when its confidence means what it says \u2014 among all the cases it scored 0.7, about 70% are positive. Ranking quality and calibration are independent: a model can rank perfectly while being systematically overconfident.\n\nIt matters whenever a downstream system treats the score as a probability rather than a ranking. Expected-value calculations, risk thresholds, budget pacing, deciding whether to escalate to a human, combining several models' outputs \u2014 all of these are wrong if the numbers are not probabilities.\n\nDiagnose with a reliability diagram: bucket predictions by score, plot predicted against observed frequency, and look for the diagonal. Fix with Platt scaling or isotonic regression fit on a held-out set. Note that modern deep networks are typically overconfident out of the box, and that the usual tricks \u2014 more capacity, longer training \u2014 tend to make calibration worse while improving accuracy.\n\nSTRONG: distinguishes calibration from accuracy explicitly and names a concrete decision that breaks without it.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "Why is ROC-AUC sometimes misleading, and what would you use instead?",
+  "a": "\nROC-AUC plots true-positive rate against false-positive rate. The false-positive rate has the total negative count in its denominator, so when negatives massively outnumber positives, even a large absolute number of false positives barely moves it. The curve stays high and the model looks strong while being unusable in practice.\n\nPrecision\u2013recall curves put the positives in the denominator of both axes, so they expose exactly the behaviour you care about on a rare class. On a 1-in-10,000 problem, a model with 0.98 ROC-AUC can have a precision of 2% at useful recall, and only the PR curve shows that.\n\nUse ROC-AUC when classes are roughly balanced or when you genuinely care about performance across both classes symmetrically. Use PR-AUC when the positive class is rare and is the one you care about.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "junior",
+  "q": "What is cross-validation and when is plain k-fold wrong?",
+  "a": "\nSplit the data into k parts, train on k-1 and validate on the remaining one, rotate, and average. It gives a more stable estimate than a single split and uses all the data for both roles.\n\nPlain k-fold is wrong whenever rows are not independent and identically distributed. With time series it leaks the future into the past, and you need forward-chaining splits where you only ever validate on data later than the training data. With grouped data \u2014 multiple rows per user, per patient, per document \u2014 random splitting puts the same entity on both sides, and you need grouped k-fold. With severe class imbalance you want stratification so every fold contains some positives.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "senior",
+  "q": "A model performs well offline and poorly in production. Walk me through your diagnosis.",
+  "a": "\nI would work through the causes in order of how common they are, because guessing is expensive.\n\nFirst, training\u2013serving skew: is the feature computed identically in both places? Different code paths for batch and online features is the single most common cause I have seen. I would take a set of production requests, recompute the features offline, and diff them. This finds it more often than anything else.\n\nSecond, leakage: was the offline number ever real? Re-examine the split for temporal and group leakage. An offline number that was inflated from the start looks exactly like a production regression.\n\nThird, distribution shift: compare the input distributions between the training window and current traffic, feature by feature. Also check the label distribution, since the base rate moving changes calibration even when inputs are stable.\n\nFourth, feedback loops: is the model's own output changing the data? In ranking and recommendation this is guaranteed, and it means your logs record what users did given what you showed them.\n\nFifth, the boring ones: stale model artefact, wrong preprocessing version, a truncated feature, a silently failing upstream service filling nulls with zeros.\n\nSTRONG: proposes the feature-diff between offline and online first, because it is cheap and catches the most common cause.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "What is the curse of dimensionality and how does it affect nearest-neighbour methods?",
+  "a": "\nAs dimensions increase, the volume of the space grows exponentially while your data does not, so points become sparse and the distances between them concentrate \u2014 the ratio between the nearest and farthest neighbour approaches one. \"Nearest\" stops being meaningfully different from \"farthest.\"\n\nFor k-NN and for vector search this is the core difficulty: in high dimensions the notion of a close neighbour degrades, and you need more data, or dimensionality reduction, or a learned metric that puts the useful structure into fewer effective dimensions.\n\nThe reason embedding search works at all despite using hundreds of dimensions is that real embeddings do not fill the space uniformly. They lie on a much lower-dimensional manifold, and the relevant quantity is that intrinsic dimensionality, not the nominal vector length.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "junior",
+  "q": "What is the difference between bagging and boosting?",
+  "a": "\nBagging trains many models independently on bootstrap resamples and averages them. Because the models are trained in parallel on different samples, their errors are partly uncorrelated, and averaging reduces variance. Random forests add feature subsampling to decorrelate the trees further.\n\nBoosting trains models sequentially, each one fitting the errors the ensemble has made so far. It reduces bias \u2014 it can turn weak learners into a strong one \u2014 but because each model is fitted to the current residuals, it can overfit if you let it run too long.\n\nPractical consequence: bagging is hard to overfit and easy to parallelise; boosting usually wins on accuracy but needs its learning rate and tree count tuned together, and needs early stopping.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "How do you handle missing values, and when is imputation the wrong answer?",
+  "a": "\nFirst I would establish why they are missing, because the mechanism determines what is safe. Missing completely at random is benign. Missing at random \u2014 explainable by other observed features \u2014 can be imputed with a model. Missing not at random, where the missingness depends on the unobserved value itself, cannot be imputed honestly: income is missing more often when income is high, and any imputation bakes in a wrong assumption.\n\nIn practice, missingness is often signal, not absence. A user who did not fill in a field is different from one who did. So I would add an explicit indicator column and let the model use it, rather than silently replacing with a mean and destroying the information.\n\nGradient boosting implementations handle missing values natively by learning a default direction at each split, which is usually better than anything you would do by hand. And whatever you do must be fit inside the fold, or you have leaked.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "senior",
+  "q": "Your stakeholder wants to know why the model rejected a specific application. What do you tell them?",
+  "a": "\nI would separate what I can honestly say from what I would like to say.\n\nFor a linear model the answer is direct: the coefficients and this applicant's feature values give a decomposition you can read off. For a tree ensemble or a network, I would use SHAP values, which attribute the prediction to features with a defensible additive decomposition, and I would show the top contributing features with their direction.\n\nThen I would state the caveat clearly, because this is where people get misled: these are attributions of the model's behaviour, not causal explanations of the world. SHAP tells you what the model used, not what would happen if the applicant changed it. Saying \"your income caused the rejection\" is a claim the method does not support.\n\nFor an adverse-action notice there is usually a regulatory standard for what must be disclosed, and I would work to that standard rather than inventing one. If the use case requires genuinely explainable decisions, that is an argument for choosing an interpretable model class up front, not for post-hoc explanation of a black box.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "mid",
+  "q": "What is the difference between parametric and non-parametric models?",
+  "a": "\nA parametric model has a fixed number of parameters chosen before seeing the data \u2014 linear regression has one coefficient per feature regardless of whether you have a thousand rows or a billion. A non-parametric model's complexity grows with the data: k-NN keeps every training point, and a decision tree grows more nodes as there is more structure to capture.\n\nThe trade-off is the usual one. Parametric models are fast, compact, and make strong assumptions that are wrong in a predictable way. Non-parametric models make weaker assumptions and can capture arbitrary structure, at the cost of needing more data and more memory, and of being slower at prediction time.\n\nThe name is a little misleading \u2014 non-parametric does not mean no parameters, it means the number is not fixed in advance.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "junior",
+  "q": "What does it mean for a feature to be predictive but not causal, and why does it matter?",
+  "a": "\nIt means the feature correlates with the target well enough to help prediction, without being part of what produces the target. The classic example: hospital-visit frequency predicts illness, but sending someone to hospital does not make them ill.\n\nIt matters for two reasons. First, intervention: if anyone plans to act on the feature \u2014 change a price, change a policy, change a UI \u2014 a predictive-only feature will not produce the expected effect, and the model cannot tell you that. Second, robustness: non-causal correlations are the ones most likely to break under distribution shift, because they depend on a stable relationship in the environment rather than on a mechanism.\n\nSo a model can be an excellent predictor and a terrible guide to action, and those two jobs get confused constantly.\n"
+ },
+ {
+  "track": "fundamentals",
+  "level": "senior",
+  "q": "How would you detect and handle label noise?",
+  "a": "\nDetect it by looking at where the model disagrees confidently with the label. Train with cross-validation, collect out-of-fold predictions, and rank the training rows by loss. High-loss rows with a confident prediction against the label are candidates for being mislabelled, and reading a sample of them by hand is genuinely informative \u2014 it is one of the highest-value hours you can spend on a dataset.\n\nMeasure it by double-labelling a sample and computing inter-annotator agreement. That number is your ceiling: if two humans agree 85% of the time, a model that scores 90% is either exploiting an artefact or the evaluation is wrong.\n\nHandle it by fixing labels where the cost justifies it, using loss functions that are more robust to noisy labels, and avoiding training regimes that memorise hard examples \u2014 networks fit clean patterns first and memorise noise later, so early stopping is genuinely protective here.\n\nThe important framing: label noise caps your achievable performance, so knowing its level tells you when to stop optimising the model and start fixing the data.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "junior",
+  "q": "Why do we need non-linear activation functions?",
+  "a": "\nWithout them the whole network collapses. A composition of linear maps is itself a linear map, so a hundred stacked linear layers compute exactly what one linear layer computes \u2014 you have spent a hundred times the compute to get logistic regression.\n\nThe non-linearity is what lets depth buy you anything: it makes the composition express functions no single layer can.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "What causes vanishing and exploding gradients, and what fixes them?",
+  "a": "\nBackpropagation multiplies Jacobians layer by layer. If the typical factor is below one, the product shrinks geometrically with depth and early layers stop learning. If it is above one, the product blows up and training diverges or produces NaNs.\n\nVanishing was the historical blocker for deep networks and sigmoid or tanh made it worse, because their derivatives saturate near zero across most of their input range. The fixes that actually mattered: ReLU-family activations with derivative 1 on the positive side; residual connections, which give the gradient an identity path that does not get multiplied down; careful initialisation scaled to fan-in so activations neither shrink nor grow through depth; and normalisation layers that keep activation statistics stable.\n\nExploding is easier \u2014 gradient clipping by global norm handles it directly, and is standard in sequence models.\n\nSTRONG: identifies the residual connection as the single most important structural fix and explains why \u2014 the identity path means the gradient reaches early layers undiminished regardless of depth.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "Explain the difference between batch normalisation and layer normalisation.",
+  "a": "\nBatch norm normalises each feature across the examples in the batch. Layer norm normalises each example across its own features. That difference decides where each one is usable.\n\nBatch norm's statistics depend on the other examples in the batch, which creates three problems: it degrades badly at small batch sizes because the statistics are noisy; it does not fit variable-length sequences cleanly; and it behaves differently at training and inference, since inference uses running averages rather than batch statistics. That last one is a real source of train/serve skew.\n\nLayer norm has none of those properties \u2014 it is per-example, so batch size is irrelevant and training and inference are identical. That is why transformers use it, and why RMSNorm, a cheaper variant that skips the mean-centring, has largely replaced it in recent large models.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "What does Adam do that SGD does not, and when would you still choose SGD?",
+  "a": "\nAdam keeps a per-parameter running estimate of the first moment (the mean gradient, which is momentum) and the second moment (the uncentred variance), and divides the update by the square root of the second moment. The effect is a per-parameter adaptive step size: parameters with consistently large gradients get smaller steps, and rarely-updated parameters get larger ones. It also bias-corrects both estimates, which matters in the first few hundred steps.\n\nThe practical payoff is that it works reasonably well without much tuning, which is why it is the default for transformers and for anything with sparse gradients.\n\nSGD with momentum is still preferred in some vision settings, where a well-tuned schedule has historically generalised slightly better. The honest version of that claim is that the gap is small, contested, and usually smaller than the gap from tuning the learning rate properly.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "senior",
+  "q": "Why does AdamW exist? What was wrong with L2 regularisation in Adam?",
+  "a": "\nIn plain Adam, if you implement weight decay by adding an L2 term to the loss, the resulting gradient contribution goes through the same adaptive scaling as everything else \u2014 it gets divided by the square root of the second-moment estimate. So parameters with a large gradient history are effectively regularised less, and parameters with small gradients are regularised more. That is not what you meant by \"decay all weights toward zero at rate lambda.\"\n\nAdamW decouples them: it applies the adaptive update from the loss gradient, and then separately subtracts lambda times the weight. Now decay is uniform and the hyperparameter means what it says.\n\nThe practical consequence is not academic \u2014 it changes the optimal weight decay value by an order of magnitude and measurably improves final validation loss. It is the default for transformer training for this reason.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "Your loss is NaN after a few hundred steps. How do you debug it?",
+  "a": "\nNaN comes from a small number of places, so I would check them in order rather than guess.\n\nLearning rate too high is the most common \u2014 the update overshoots, weights explode, and the forward pass overflows. Halve it and see whether the failure moves later.\n\nNumerical operations without guards: a log of zero, a division by a near-zero denominator, a square root of a negative, an exponential of a large positive. Fused implementations of softmax-cross-entropy exist precisely to avoid this, so a hand-rolled loss is a prime suspect.\n\nMixed precision without loss scaling: float16 has a narrow range, gradients underflow to zero or overflow to inf. Check that the gradient scaler is actually enabled.\n\nBad input data: a NaN or inf that came in with the batch and propagated. Assert on the inputs.\n\nThe efficient procedure is to find the first step where it appears, then register hooks to print the norm of activations and gradients per layer at that step. The layer where the norm first blows up tells you where to look, and that usually takes one run rather than ten guesses.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "What is gradient accumulation and when do you need it?",
+  "a": "\nRun several forward and backward passes, summing the gradients, and only step the optimiser after N of them. The effective batch size becomes N times the micro-batch, without ever holding N times the activations in memory.\n\nYou need it when the batch size you want does not fit \u2014 large models, long sequences, or a GPU smaller than the one the recipe assumed. It buys the optimisation behaviour of a large batch at the cost of wall-clock time, since you do N times the passes per step.\n\nTwo details people get wrong: the loss must be scaled by 1/N so the accumulated gradient is a mean rather than a sum, and any per-batch normalisation layer still sees only the micro-batch, so batch norm does not benefit from the larger effective batch at all.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "senior",
+  "q": "How do you decide whether a training job is compute-bound, memory-bound or input-bound?",
+  "a": "\nMeasure, do not reason about it. A profiler that shows the timeline is the tool, and the answer is usually visible in one run.\n\nIf GPU utilisation is high and steady, you are compute-bound and the levers are a bigger batch, mixed precision, better kernels, or fused operations.\n\nIf utilisation is high but throughput is far below the device's theoretical FLOPs, you are likely memory-bandwidth-bound \u2014 moving tensors, not multiplying them. Fusing operations to avoid round trips to memory is the fix, and this is why attention implementations that keep tiles in on-chip memory produce such large speedups.\n\nIf GPU utilisation is spiky with gaps, the accelerator is idle waiting for data and you are input-bound. More dataloader workers, prefetching, pinned memory, a faster storage format, or doing the decoding on the GPU. This case is extremely common and extremely expensive \u2014 idle accelerators are the most wasteful line in most ML budgets \u2014 and almost nobody checks for it.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "junior",
+  "q": "What is transfer learning and why does it work?",
+  "a": "\nTake a model trained on a large general task, keep its learned representations, and adapt it to your smaller specific task \u2014 either by training only a new head, or by fine-tuning some or all of the weights at a low learning rate.\n\nIt works because the early layers learn features that are general rather than task-specific: edges and textures in vision, syntax and word relationships in language. Those do not need to be relearned from your 5,000 examples, and could not be learned from them.\n\nThe practical rule: the less data you have and the closer your task is to the original, the more of the network you should freeze.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "What is the receptive field of a CNN and why does it matter?",
+  "a": "\nThe region of the input that can influence a given output unit. It grows with depth, kernel size, stride and dilation, and you can compute it exactly from the architecture.\n\nIt matters because it bounds what the model can possibly see. If you are detecting an object that spans 200 pixels and your receptive field at the prediction layer is 60 pixels, the model physically cannot see the whole object and no amount of training fixes it. Diagnosing a model that fails on large objects usually starts here.\n\nIt is also the cleanest contrast with self-attention, where every position can attend to every other from the first layer \u2014 global receptive field immediately, at quadratic cost.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "Why do residual connections help?",
+  "a": "\nTwo reasons, and both matter.\n\nOptimisation: the identity path gives gradients a route to early layers that is not multiplied by a chain of Jacobians, which is what kills them in a plain deep stack. This is why 50-layer residual networks train when 50-layer plain stacks do not.\n\nRepresentation: the block only has to learn the difference from the identity, so adding a layer can never make things structurally worse \u2014 a block that learns zero leaves the signal untouched. A plain deep network has to learn the identity explicitly to achieve the same thing, and that turns out to be hard.\n\nEmpirically, deep plain networks were observed to have higher training error than shallower ones, which is an optimisation failure rather than overfitting, and residuals were the fix.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "senior",
+  "q": "How would you overfit a single batch, and why is that the first thing you do?",
+  "a": "\nTake one batch of a handful of examples, turn off all regularisation, augmentation and dropout, and train on that batch repeatedly. The loss should go to approximately zero.\n\nIt is the first test because it separates \"the model cannot learn\" from \"the model cannot generalise\", and those have completely different causes. If a model cannot memorise eight examples, no amount of data or tuning will help \u2014 there is a bug. Usually it is a detached gradient, an optimiser that was never stepped, a learning rate of zero, labels misaligned with inputs, or a loss computed over the wrong axis.\n\nIt runs in seconds, it has a binary pass/fail answer, and it rules out an enormous class of defects before you spend a day on a real training run. That is the definition of a good first test.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "What is knowledge distillation?",
+  "a": "\nTrain a small student model to match a large teacher's outputs rather than only the hard labels. The teacher's full probability distribution carries more information than a one-hot label \u2014 it says this image is mostly a cat, somewhat a lynx, and definitely not a truck \u2014 and those relative similarities are a much richer training signal.\n\nUsually done by training on a temperature-softened version of the teacher's logits, sometimes combined with the true labels, sometimes matching intermediate representations too.\n\nIn practice it is how you ship: train or use a large model for quality, distil into something small enough to serve within your latency and cost budget. The student frequently outperforms the same architecture trained from scratch on the same data.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "What should the initial loss of your classifier be, and why do you care?",
+  "a": "\nFor an n-class classifier with cross-entropy and no useful prior, it should be ln(n). Ten classes gives about 2.303; two classes about 0.693.\n\nI care because it is a free correctness check that runs before training does anything. If the initial loss is far from that value, the model is already broken \u2014 the final layer has a bias that is wrong, the labels are misaligned, the loss is being applied over the wrong dimension, or the output is being passed through softmax twice.\n\nIt costs one line and catches real bugs, which is the best ratio available in this work.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "senior",
+  "q": "Explain mixed-precision training and what can go wrong.",
+  "a": "\nStore and compute most of the network in a 16-bit format for speed and memory, while keeping a master copy of the weights and the optimiser state in float32 so that small updates are not lost to rounding.\n\nWhat goes wrong is range. float16 has about 5 exponent bits, so small gradients underflow to zero and large ones overflow to infinity. The standard mitigation is loss scaling: multiply the loss by a large factor before the backward pass so gradients land inside the representable range, then unscale before the optimiser step, and skip any step where an inf or NaN appeared.\n\nbfloat16 has the same exponent range as float32 and less mantissa, so it mostly removes the need for loss scaling at the cost of precision. On hardware that supports it, it is the easier choice and is why it has become the default for large model training.\n\nThings that still bite: accumulating reductions in 16-bit, softmax and layer norm computed in low precision, and comparing runs across precisions without expecting bit-level differences.\n"
+ },
+ {
+  "track": "deep-learning",
+  "level": "mid",
+  "q": "When would a vision transformer beat a CNN, and when would it lose?",
+  "a": "\nA ViT wins when you have a lot of data or a strong pretrained checkpoint. Attention is a weaker prior than convolution \u2014 it does not assume locality or translation equivariance \u2014 so given enough data it can learn relationships a CNN's structure forbids, including long-range ones.\n\nIt loses on small datasets trained from scratch, for exactly the same reason: the prior a CNN bakes in for free is one the ViT has to learn from examples it does not have. Heavy augmentation and regularisation narrow this gap but do not close it.\n\nThe generalisable lesson is the one worth giving in an interview: architecture is a prior, and a prior helps when data is scarce and constrains when data is abundant.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "junior",
+  "q": "Explain self-attention in plain language.",
+  "a": "\nEvery token produces three vectors: a query saying what it is looking for, a key advertising what it offers, and a value carrying its content. To compute a token's output, you compare its query against every key to get a set of weights, then take the weighted sum of the values.\n\nSo each token's new representation is a blend of all the tokens, weighted by how relevant they are to it. \"It\" in a sentence ends up mostly a blend of whatever noun it refers to, because that noun's key matched its query.\n\nMulti-head means doing this several times in parallel with different learned projections, so different heads can specialise in different relationships.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "Why is attention scaled by the square root of the key dimension?",
+  "a": "\nThe dot product of two vectors with independent unit-variance components has variance equal to the dimension. So as d grows, the raw scores spread out proportionally to the square root of d.\n\nLarge-magnitude scores push softmax into saturation: one entry approaches 1, the rest approach 0, and the gradient of softmax there is nearly zero. Training stalls.\n\nDividing by the square root of d brings the score variance back to roughly 1 regardless of head dimension, keeping softmax in a region where gradients flow. It is a variance-control fix, not an arbitrary constant.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What is a KV cache and why does it matter so much?",
+  "a": "\nIn autoregressive generation, each new token attends to all previous tokens. Without caching you would recompute the keys and values for the entire prefix at every step, which makes generating n tokens quadratic in total work.\n\nThe keys and values for tokens already processed do not change, so you compute them once and keep them. Each new step then computes only its own query, key and value, and attends against the cache. Generation becomes linear in sequence length.\n\nIt matters because it converts an impossible cost into a feasible one, and because it moves the bottleneck: the cache is large, it grows with batch size and context length, and on a real serving deployment it is usually what limits your maximum batch size \u2014 which is to say, it limits your throughput and therefore your cost per request.\n\nSTRONG: can state the size formula \u2014 roughly 2 x layers x heads x head_dim x seq_len x batch x bytes_per_element \u2014 and note that grouped-query attention exists specifically to shrink it.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "senior",
+  "q": "Why does context length cost so much? Be precise about what scales how.",
+  "a": "\nTwo different costs that get conflated.\n\nAttention is quadratic: every token attends to every other, so the score matrix is n by n. Doubling context quadruples that work. This dominates during prefill, when the whole prompt is processed at once.\n\nThe feed-forward sublayer and the projections are linear in n. Doubling context doubles them.\n\nThe KV cache is linear in n but persistent \u2014 it occupies memory for the whole generation, per sequence in the batch. This is why long context reduces how many concurrent requests you can serve, and why the practical limit on context is often memory rather than compute.\n\nDuring decode, each new token attends over the whole cache, so per-token cost grows linearly with how much context has accumulated. A long conversation gets progressively more expensive per token, which surprises people.\n\nSTRONG: separates prefill from decode, and notes that memory-efficient attention implementations reduce the memory cost of the score matrix without changing the asymptotic compute.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What problem do rotary position embeddings solve?",
+  "a": "\nAttention is permutation-invariant \u2014 without position information \"dog bites man\" and \"man bites dog\" produce identical representations. Something has to inject order.\n\nAbsolute learned embeddings add a per-position vector, which works but cannot extrapolate: position 5000 has no learned embedding if you only trained to 2048.\n\nRoPE instead rotates the query and key vectors by an angle proportional to their position. Because the attention score depends on the dot product of a query and key, and rotating both by their respective angles makes that dot product depend on the difference of the angles, the resulting score is a function of relative position. That is the property you want: the relationship between tokens 5 and 8 is encoded the same way as between 1005 and 1008.\n\nIt also degrades more gracefully beyond the trained length, and interpolation schemes exploit exactly that structure to extend context after training.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "Why does tokenisation cause so many practical problems?",
+  "a": "\nBecause the model does not see characters, it sees subword units, and the boundaries are chosen by a compression algorithm rather than by meaning.\n\nCharacter-level tasks fail: counting letters, reversing strings, or spotting that two words are anagrams is hard when the model never sees individual letters. Arithmetic degrades on long numbers because digit groupings are inconsistent \u2014 the same digit sequence can tokenise differently depending on what surrounds it.\n\nNon-English text is typically split into more tokens per unit of meaning, especially for non-Latin scripts. That is a direct cost multiplier and a direct reduction in effective context, and it is invisible unless you measure it.\n\nAnd trailing whitespace changes tokenisation, which is why a prompt ending in a space sometimes produces noticeably worse completions.\n\nThe important interview point: a large fraction of \"the model is stupid\" reports are tokenisation artefacts, not reasoning failures.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "Explain temperature, top-k and top-p. Which would you ship for extraction?",
+  "a": "\nTemperature scales the logits before softmax. Below 1 sharpens the distribution toward the most likely token; above 1 flattens it toward uniform.\n\nTop-k truncates to the k most likely tokens and renormalises. Simple, but a fixed k is wrong in both directions: when the model is confident, k=50 admits 49 bad options; when it is uncertain, k=50 may cut off good ones.\n\nTop-p (nucleus) takes the smallest set of tokens whose cumulative probability exceeds p. It adapts to the shape of the distribution, which is why it generally beats top-k.\n\nFor extraction I would ship temperature at or near 0 with the sampling cutoffs effectively disabled, because I want the single most likely parse and I want it to be reproducible. For creative generation, temperature around 0.8\u20131.0 with top-p around 0.9 is a reasonable starting point, tuned on examples.\n\nSTRONG: notes that temperature 0 is not strictly deterministic in a batched serving environment, because floating-point reduction order varies with batch composition.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "senior",
+  "q": "What is the difference between RLHF and DPO, and why did DPO get adopted so fast?",
+  "a": "\nBoth optimise a model against human preferences expressed as pairwise comparisons.\n\nRLHF does it in two stages: train a separate reward model to predict which response a human would prefer, then use reinforcement learning \u2014 usually PPO \u2014 to optimise the policy against that reward, with a KL penalty holding it near the reference model so it does not collapse into reward hacking.\n\nDPO shows that for this particular objective you can skip the reward model and the RL loop entirely. There is a closed-form relationship between the optimal policy and the reward, so you can rewrite the objective as a classification loss directly on preference pairs, optimised with ordinary supervised training.\n\nIt was adopted quickly because the operational difference is enormous. PPO requires maintaining four models in memory, is sensitive to hyperparameters, and is genuinely hard to make stable. DPO is a loss function you can drop into an existing fine-tuning pipeline.\n\nWhat you give up: the reward model can be reused and can score arbitrary new outputs, online RL can explore beyond the preference dataset, and PPO's explicit KL control is more direct. DPO is bounded by the preference data you have.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What are scaling laws and what did the compute-optimal result change?",
+  "a": "\nScaling laws are the empirical finding that model loss falls as a smooth power law in model size, dataset size and compute, over many orders of magnitude \u2014 which makes it possible to predict the performance of a large training run from small ones.\n\nThe compute-optimal result changed the allocation. Earlier practice scaled parameters aggressively while keeping data roughly fixed; the finding was that for a fixed compute budget, parameters and training tokens should scale roughly together, and that prevailing models were substantially undertrained for their size.\n\nThe practical consequence, and the one worth stating in an interview, is economic rather than academic: a smaller model trained on more data reaches the same loss while costing less to serve for the entire life of the deployment. Since inference cost scales with parameters and is paid on every request forever, that is usually the dominant term. Compute-optimal training and cost-optimal deployment are different objectives, and deployment usually wins.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What is the difference between a base model and an instruction-tuned model?",
+  "a": "\nA base model is trained only to predict the next token over a large corpus. It is a very good continuation engine and it does not know it is in a conversation \u2014 ask it a question and a plausible continuation is another question, because that is what documents containing questions look like.\n\nAn instruction-tuned model has been further trained on demonstrations of following instructions, and usually aligned against human preferences afterwards. That is what makes it answer rather than continue, follow formatting requests, and refuse certain things.\n\nPractical implications: base models are better for pure completion tasks and for fine-tuning when you want to impose your own behaviour without fighting existing alignment. Instruction-tuned models are what you want for anything conversational. And the alignment process has a measurable cost on some raw capabilities, which is worth knowing when you are benchmarking.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "senior",
+  "q": "How would you extend a model's context window beyond what it was trained on?",
+  "a": "\nThe obstacle is positional encoding: the model has not seen positions beyond its training length, so the encodings are out of distribution and quality degrades sharply rather than gracefully.\n\nWith RoPE there are two families of approach. Position interpolation rescales positions so the extended range maps back into the trained range \u2014 effectively compressing the rotation frequencies \u2014 followed by a short fine-tune. NTK-aware and YaRN-style scaling refine this by treating different frequency bands differently, on the observation that high-frequency components carry local detail and should be scaled less aggressively than low-frequency ones.\n\nEither way a modest fine-tune on long sequences is usually required to recover quality.\n\nThen the honest caveat: extending the window is not the same as making the model use it. Retrieval accuracy over long contexts degrades in the middle regardless of nominal window size, so I would evaluate with a needle-in-a-haystack test at varying depths before claiming the longer context works. And the memory cost of the KV cache grows linearly, so a longer window reduces the batch size you can serve, which is a throughput and cost decision, not just a capability one.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What is grouped-query attention and what problem does it solve?",
+  "a": "\nIn standard multi-head attention each head has its own keys and values, so the KV cache size scales with the number of heads. That cache is usually what limits batch size in serving, which means it limits throughput.\n\nMulti-query attention takes this to the extreme: all query heads share a single key and value head, shrinking the cache dramatically. It costs some quality.\n\nGrouped-query attention is the middle: query heads are divided into groups, and each group shares one key/value head. With eight groups instead of sixty-four heads you get most of the memory saving with much less quality loss.\n\nIt is a pure serving-economics optimisation, and it is now standard in large open models for that reason.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "Why do language models hallucinate?",
+  "a": "\nBecause they are trained to produce likely continuations, not true ones. Nothing in next-token prediction distinguishes a fact from a fluent-sounding fabrication, and a confident, well-formed wrong answer is exactly as probable-looking as a right one.\n\nSeveral things compound it. The training objective rewards always producing an answer rather than abstaining. Preference tuning can make it worse, since human raters tend to prefer confident, complete answers over hedged ones. And the model has no representation of the boundary of its own knowledge \u2014 there is no internal signal saying \"this was in the training data\" versus \"this is a plausible interpolation.\"\n\nMitigations do not remove it: ground answers in retrieved context, instruct explicit refusal when context is insufficient, require citations and validate them programmatically, and check consistency across samples \u2014 facts the model knows are stable across resampling, fabrications vary.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "senior",
+  "q": "How do you measure whether a model actually uses its long context?",
+  "a": "\nNot with perplexity, which averages over all positions and hides exactly the failure you are looking for.\n\nThe direct test is needle-in-a-haystack: plant a specific fact at a known depth inside filler text of a given length, ask a question only that fact answers, and sweep both the context length and the depth. You get a grid of retrieval accuracy. The characteristic result is strong performance at the beginning and end and a degraded band in the middle, which is the lost-in-the-middle effect, and it tells you the usable context rather than the advertised one.\n\nThen go beyond it, because single-fact retrieval is the easiest possible long-context task. Multi-needle variants require finding several facts. Harder still is aggregation \u2014 questions whose answer depends on material spread across the whole context \u2014 and models that look perfect on single-needle tests frequently fail these.\n\nFinally, evaluate on your actual task at realistic context lengths. A synthetic benchmark tells you the mechanism works; only your own evaluation tells you the product works.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What is speculative decoding?",
+  "a": "\nDecoding is memory-bandwidth-bound: generating one token requires reading the entire model's weights from memory, and that read dominates the tiny amount of arithmetic involved. Verifying several tokens at once costs barely more than verifying one, because it is the same weight read.\n\nSpeculative decoding exploits that. A small fast draft model proposes several tokens ahead; the large model then evaluates all of them in a single forward pass and accepts the longest prefix that matches what it would have produced itself. Rejected tokens are discarded and generation continues.\n\nDone correctly the accepted output is distributed identically to what the large model alone would have produced \u2014 it is a pure latency optimisation, not a quality trade. The speedup depends on the acceptance rate, which depends on how well the draft model mimics the target.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "junior",
+  "q": "What is the difference between an encoder-only, decoder-only and encoder-decoder model?",
+  "a": "\nEncoder-only models use bidirectional attention \u2014 every token sees every other in both directions. Good for understanding tasks: classification, retrieval embeddings, token labelling. They cannot generate autoregressively.\n\nDecoder-only models use causal attention, where each token sees only what came before. That is what makes autoregressive generation possible, and it is the architecture of essentially all modern large language models.\n\nEncoder-decoder models encode an input bidirectionally and then generate an output autoregressively while attending to the encoding. Natural for translation and summarisation, where input and output are distinct sequences.\n\nThe field consolidated on decoder-only at scale largely because one architecture trained one way handles every task when you phrase the task as text, and that simplicity compounds.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "mid",
+  "q": "What is perplexity and what are its limits as a metric?",
+  "a": "\nThe exponential of the average negative log-likelihood per token \u2014 loosely, how many options the model is effectively choosing between at each step. Lower is better.\n\nIts limits are severe enough to matter. It is only comparable between models sharing a tokeniser, since it is per-token and tokenisation changes the denominator. It is dominated by the easy, frequent tokens, so large changes in the rare cases you actually care about barely move it. It measures likelihood under the model, not correctness, usefulness, or safety. And it averages over positions, which hides long-context degradation.\n\nIt is a good training diagnostic and a poor product metric. Anything user-facing needs task evaluation.\n"
+ },
+ {
+  "track": "nlp-llm",
+  "level": "senior",
+  "q": "A customer says the model 'got worse' this week with no deploy on your side. How do you investigate?",
+  "a": "\nFirst I would establish whether it is real, because \"got worse\" is frequently a shift in what users are asking rather than in what the model does. I would run the fixed evaluation suite against the current endpoint and compare with the last recorded run. If the suite is flat, the change is in the traffic, and I would compare this week's query distribution with last month's.\n\nIf the suite did regress, the candidates are: an upstream model version moved under an unpinned alias; a change in default sampling parameters; a system prompt edited by someone outside the deploy path \u2014 prompts are production code and frequently are not treated as such; a retrieval index that grew, drifted, or lost documents; or a truncation threshold being crossed as prompts grew longer.\n\nThis whole investigation is only possible if the evaluation suite and its history exist. Without them the honest answer is \"I cannot tell you,\" and the real lesson is to build the suite before you need it.\n\nSTRONG: checks whether the regression is measurable before theorising about causes, and names unpinned model aliases and out-of-band prompt edits as the two most common culprits.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "junior",
+  "q": "What is RAG and what problem does it solve?",
+  "a": "\nRetrieval-augmented generation: at question time, search a corpus you control, put the relevant passages into the model's context, and have it answer from those rather than from memory.\n\nIt solves four things at once. Knowledge that postdates training. Knowledge that was never in training \u2014 your internal documents. Attribution, because you can cite what you retrieved. And revocation, because deleting a document stops it influencing answers immediately, which retraining cannot do.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "When would you not use RAG?",
+  "a": "\nWhen the answer requires the whole corpus rather than parts of it \u2014 aggregations and \"across all documents\" questions. Retrieval returns k chunks and cannot see the rest, so that is a data pipeline problem.\n\nWhen the corpus is small and stable enough to fit in context. Put it in the prompt, cache it, and delete an entire subsystem along with all of its failure modes.\n\nWhen the problem is behaviour rather than facts. Wrong format, wrong tone, wrong structure \u2014 retrieval adds knowledge, it does not teach form.\n\nWhen the latency budget is very tight. Embedding, searching, reranking and generating does not fit under a couple of hundred milliseconds.\n\nSTRONG: treats \"should this be RAG at all\" as the first design question rather than assuming the architecture.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "senior",
+  "q": "Your RAG system gives fluent, confident, wrong answers. Diagnose it.",
+  "a": "\nThe first job is to find out which half is broken, and that is a measurement, not a guess.\n\nTake the failing questions and check whether the correct chunk was in the retrieved set at all. If it was not, this is a retrieval failure and nothing about the prompt will fix it. If it was present and the model still answered wrongly, it is a generation failure.\n\nFor the retrieval case: is it a vocabulary mismatch \u2014 try BM25 alone and see if it finds the document instantly, which indicates dense-only retrieval failing on literal terms. Is a filter excluding it \u2014 rerun with filters off. Is the chunk boundary splitting the answer in half. Is the embedding model truncating oversized chunks silently.\n\nFor the generation case: the usual cause is that the model fell back on parametric knowledge because nothing told it not to. The single highest-value line in a RAG system prompt instructs the model to answer only from the provided context and to say plainly when the context is insufficient. Without it, an unanswerable question produces a confident fabrication, which is precisely the failure RAG was supposed to prevent.\n\nThe meta-point: a system with one end-to-end quality number cannot answer this question at all. You need retrieval and generation measured separately.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "Why use hybrid search instead of dense retrieval alone?",
+  "a": "\nBecause they fail in complementary places. Dense retrieval matches meaning and is poor at rare literal strings \u2014 part numbers, error codes, product names, people \u2014 because those are not well represented in embedding space. BM25 matches terms exactly and misses paraphrase entirely: \"how do I cancel\" will not find a page titled \"Ending your plan.\"\n\nReal query logs contain a lot of both kinds. Running both and fusing the ranked lists gets you the union of their strengths for very little cost, since BM25 is cheap and requires no training.\n\nFuse with reciprocal rank fusion rather than by normalising and adding scores, because cosine similarity and BM25 live on incomparable scales and any normalisation you pick is query-dependent and fragile.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "What is reranking and when is it not worth it?",
+  "a": "\nRetrieval embeds the query and the document independently, which is what makes an index possible and also what caps its precision \u2014 the model never saw the pair together. A cross-encoder takes query and document jointly and scores relevance directly. Much more accurate, far too slow to run over a corpus, so it runs as a second stage over the 50\u2013100 candidates retrieval already found.\n\nIt is typically the largest single quality improvement available to a mediocre RAG system.\n\nIt is not worth it when recall@10 on your evaluation set is already near the ceiling \u2014 the reranker has nothing left to reorder and you are paying latency for nothing. It is also not worth the candidate count you assumed: if reranking 30 candidates scores the same as 100 on your evaluation set, you have been paying for 70 extra forward passes per query. Measuring that marginal return is a five-minute job that most teams never do.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "senior",
+  "q": "How do you evaluate a RAG system?",
+  "a": "\nTwo separate measurements, because they have different fixes.\n\nRetrieval, using a golden set of real questions labelled with the chunks that actually contain the answer: recall@k first, since it is the ceiling on everything downstream, plus precision@k, MRR, and nDCG@k when relevance is graded. These need no model, run in CI, and are deterministic.\n\nGeneration: faithfulness \u2014 is every claim supported by the retrieved context \u2014 plus answer relevance and, where you have reference answers, correctness. Faithfulness is the number that catches hallucination, and note that it says nothing about truth: an answer can be perfectly faithful to a retrieved document that is itself wrong.\n\nBefore reaching for a judge model, write the programmatic assertions: at least one citation, every cited id exists in the retrieved set, output matches the schema, length within bounds. Those are free and deterministic and catch a surprising share of real defects.\n\nWhere you do use a judge, calibrate it \u2014 label 50 to 100 examples by hand and report agreement. An uncalibrated judge produces confident numbers that mean nothing.\n\nAnd include questions your corpus genuinely cannot answer, so you measure whether the system refuses correctly rather than inventing something.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "How would you chunk a corpus of technical documentation?",
+  "a": "\nStructurally first, because technical documentation has real structure worth respecting \u2014 split on headings so a section stays together, and keep the heading path as metadata so a chunk knows it came from \"Authentication > Rate limits.\"\n\nThen parent\u2013child: embed the small chunk so the vector is sharp and specific, but return the enclosing section to the model so it can see the qualifiers. This resolves the central tension rather than trading against it.\n\nSpecial handling for the things that break naive chunking: keep tables intact or render them as text that survives splitting; keep code blocks whole, since half a function is worse than useless; strip the repeated page headers and footers that otherwise begin every chunk and make every embedding artificially similar.\n\nAnd I would verify by reading a random sample of chunks. If a chunk does not make sense to me in isolation, it will not make sense to a retriever either.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "senior",
+  "q": "A user reports seeing another tenant's document. What happened and how do you prevent it?",
+  "a": "\nAlmost certainly the access filter was applied after the search rather than during it, or a code path skipped it entirely.\n\nThe structural fix is to make the leak impossible rather than to fix the query that leaked. Partition indexes per tenant so a search physically cannot reach another tenant's vectors \u2014 then access control is routing, not filtering, and no query construction bug can cross the boundary. Where partitioning does not fit, enforce the predicate inside the data layer so no application code path can omit it.\n\nPost-filtering is also a correctness problem even when it is not a security problem: if a tenant owns 1% of the corpus, the global top-100 may contain nothing they can see, and you return an empty result while relevant material sits at rank 400.\n\nAnd this needs an automated test that attempts retrieval as tenant A for a document owned only by tenant B, running on every commit. A manual check verifies one moment in time; this is a class of bug that gets reintroduced.\n\nSTRONG: goes straight to making the failure structurally impossible rather than patching the specific query.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "What is HyDE and when does it fail?",
+  "a": "\nHypothetical Document Embeddings: instead of embedding the user's question, have a model write a hypothetical answer to it and embed that. The intuition is that questions and answers are differently shaped text, and a fake answer sits closer in embedding space to real answers than a question does.\n\nIt helps most where question vocabulary and corpus vocabulary diverge \u2014 a short colloquial question against formal technical documents.\n\nIt fails in a specific and instructive way: if the model hallucinates a confident, wrong hypothetical answer, you retrieve documents matching the hallucination. The error propagates into retrieval instead of being caught by it. It also adds a generation call to the critical path before retrieval has even started, which is often the whole latency budget.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "Why is filtered vector search harder than it looks?",
+  "a": "\nBecause filtering and approximate search fight each other.\n\nFilter after searching and you may return nothing useful: if the filter is selective, the global nearest neighbours may contain no permitted documents while relevant ones sit far down the ranking. It fails quietly \u2014 a thin result set, and the model says it does not know.\n\nFilter before searching and you break the structure the index depends on. HNSW navigates a proximity graph; if most nodes are excluded, the traversal cannot find its way and recall collapses.\n\nWhat production systems do: partition by the filter when it is coarse, so the filter becomes index selection and search is unfiltered within a partition \u2014 much the most robust option. Otherwise use an index that evaluates the predicate during traversal and over-searches to compensate, accepting a latency cost that grows with selectivity.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "How do you keep a vector index in sync with a changing corpus?",
+  "a": "\nMake indexing idempotent. Hash each chunk's content; if the hash matches what is indexed, skip it \u2014 no embedding call, no write. Derive chunk ids deterministically from document id and position so an update replaces rather than duplicates.\n\nThen handle the case that is always forgotten: when a document shrinks from twelve chunks to eight, chunks nine through twelve remain in the index, remain retrievable, and are now wrong. Orphan deletion has to be part of the pipeline.\n\nDeletion needs to reach the index and every cache layer, since a cached retrieval result can still return text from a document that has been erased \u2014 and that is usually a legal requirement rather than a nice-to-have.\n\nFinally, instrument freshness: emit the age of the oldest un-indexed document as a metric. It is the one number that tells you ingestion is falling behind before users do.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "senior",
+  "q": "Your RAG answers got worse as the corpus grew from 100k to 10M chunks. Why?",
+  "a": "\nSeveral causes, distinguishable by measurement rather than reasoning.\n\nApproximate index recall degrades as the index grows at fixed parameters. Measure it: build a flat index over a sample, run real queries against both, and compute what fraction of the exact top-10 the approximate index returns. A widening gap over time confirms this, and the fix is a higher efSearch, a rebuild with higher M, or both.\n\nNear-duplicate competition: with 100x the documents, many near-identical chunks now crowd the top-k, so the retrieved set is less diverse and may contain the same fact five times instead of five different facts. Deduplicate at ingestion and consider diversity-aware selection.\n\nDistractor density: there are simply more plausible-but-wrong chunks, so precision falls even at constant recall. This is where reranking earns its cost.\n\nEmbedding-space crowding: more vectors in the same space means smaller distances between unrelated items, which reduces the separation your similarity threshold relies on.\n\nThe diagnostic order matters \u2014 measure recall against exact search first, because if that is the cause the other investigations are wasted.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "How do you stop a RAG system from being prompt-injected through its own corpus?",
+  "a": "\nStart from the right threat model: in RAG, the attacker's delivery mechanism is getting a document into your corpus. Any support ticket, uploaded file, crawled page or user-generated document is untrusted input that will be placed directly into the model's context.\n\nDefences, in order of value. Delimit retrieved content unambiguously and state in the system prompt that everything inside the delimiters is reference material, never instructions. Never let retrieved text reach a tool-calling path without a check \u2014 the dangerous combination is retrieval plus tools plus an action with side effects. Constrain what tools are available during a retrieval-grounded answer. Validate the output against a schema rather than trusting prose. Log the retrieved chunks so an incident is investigable.\n\nAnd test it: write the injection payload yourself, confirm your system falls for it, then fix it and confirm the payload fails. If you have not attacked your own system you do not know how it behaves.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "Should you always retrieve? How would you decide?",
+  "a": "\nNo. \"Hello\", \"thanks\", \"summarise what we just discussed\" and \"write me a haiku\" need no retrieval, and retrieving anyway injects irrelevant context that can actively degrade the answer as well as costing latency and money.\n\nPut a cheap router in front: a small classifier or a fast model call deciding whether this turn needs retrieval and, if so, which index or which filters apply. It pays for itself in latency on conversational products where a large fraction of turns are chit-chat or meta-questions.\n\nThe measurable benefit is on the unanswerable and no-retrieval-needed slices of your evaluation set, which is a good reason to make sure those slices exist.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "senior",
+  "q": "How would you design retrieval so users can verify the answer?",
+  "a": "\nVerification is a product requirement and it constrains the pipeline design, so I would work backwards from it.\n\nEvery chunk needs a stable identifier, its document title, and a precise location \u2014 section path, page, or character offsets \u2014 carried as metadata from ingestion. Without that, precise citation is impossible no matter what the model does.\n\nIn the prompt, label each retrieved passage and require the model to cite by label rather than generating free-form references, because freely generated citations are frequently fabricated. Then validate programmatically before display: every cited id must exist in the retrieved set. That check is cheap and catches a real failure mode.\n\nIn the interface, make the citation open the source at the cited location with the relevant passage highlighted, so verification costs the user one click rather than a search.\n\nAnd capture whether users click citations. It is one of the better available signals of answer quality, and it feeds straight back into the golden set.\n"
+ },
+ {
+  "track": "rag-systems",
+  "level": "mid",
+  "q": "What is contextual retrieval and what does it cost?",
+  "a": "\nA chunk pulled from its document loses what the document made implicit \u2014 \"the limit was raised to 50\" is unusable without knowing which limit and when. Contextual retrieval prepends a short generated description situating the chunk in its source document before embedding it.\n\nThe cost is one cheap model call per chunk at ingestion, which on a large corpus is real money, though caching the document across its chunks reduces it substantially.\n\nThe benefit is corpus-dependent, and that is the important part: it helps a lot where chunks are heavily context-dependent and very little where documents are self-contained. Measure on your own data rather than adopting it because it worked for someone else's.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "Design a semantic search system for 50 million internal documents.",
+  "a": "\nI would start with the questions that change the architecture: what are the queries actually like \u2014 keyword lookups or natural language; what is the latency budget; is there per-user access control; how fresh must results be; and what does a good result mean, because I need to be able to measure it.\n\nAssuming natural-language queries, tight-ish latency and per-user permissions:\n\nIngestion is a batch pipeline: parse, structurally chunk with parent\u2013child, embed in batches, and upsert by content hash so reruns are no-ops. Metadata carries document id, section path, timestamp and ACL.\n\nStorage: an HNSW index for dense vectors, a BM25 index for lexical, and the chunk text and metadata in a document store. At 50M chunks, memory is a real cost, so I would evaluate int8 quantisation with full-precision rescoring of the top candidates.\n\nServing: route the query, embed it, search dense and lexical in parallel, fuse with RRF, rerank the top 50 with a cross-encoder, return the top 10 with citations.\n\nAccess control decides the index layout. If permissions are coarse \u2014 per workspace \u2014 partition indexes so the filter becomes routing. If they are fine-grained per document, I need filtered traversal and I should expect to pay latency for it.\n\nScale and cost: the reranker is the throughput bottleneck, so it needs its own autoscaling and a cap on candidates. Cache query embeddings indefinitely and retrieval results with index-version invalidation.\n\nEvaluation from day one: a golden set of real queries, recall@10 tracked in CI, and click-through on results as the online signal.\n\nSTRONG: asks about access control early, because it is the requirement that most changes the design and is most often discovered late.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "senior",
+  "q": "Design a system to detect fraudulent transactions in real time.",
+  "a": "\nRequirements first: latency budget \u2014 this sits in the payment path, so likely tens of milliseconds; the cost asymmetry between a missed fraud and a blocked legitimate customer; volume; and whether decisions must be explainable to a regulator.\n\nFeatures are the hard part. Transaction-level attributes are available instantly. The valuable signals are aggregates \u2014 velocity over the last minute, hour and day, deviation from this customer's normal \u2014 and those must be computed identically online and offline or you get training-serving skew, which is the single most common failure in this class of system. That argues for a feature store with one definition serving both paths, and a streaming aggregation layer for the windows.\n\nModel: gradient boosting is the right default on tabular transaction data, with a graph-based or sequence model as a later addition if entity relationships matter. Class imbalance is severe, so I would evaluate with PR-AUC, not ROC-AUC, and calibrate the output because the decision threshold has to be set from expected cost.\n\nLabels are delayed and biased. A chargeback arrives weeks later, and you never observe the outcome of transactions you blocked. That censoring has to be handled deliberately \u2014 typically by letting a small random holdout through to preserve an unbiased signal, which is a business decision with a real cost.\n\nServing: a low-latency scorer with a hard timeout and a rules-based fallback, because failing open or closed must be an explicit choice rather than an accident. Shadow deployment for new models, then a canary on a traffic slice.\n\nMonitoring: score distribution, feature drift, approval rate, and the delayed-label metrics as they arrive. An alert on approval rate moving is often the fastest signal that something broke.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "Design a recommendation system for a marketplace with 10M items.",
+  "a": "\nTwo stages, because scoring 10M items per request is impossible.\n\nCandidate generation narrows millions to hundreds, cheaply. Several sources in parallel: a two-tower embedding model for personalised retrieval, co-visitation and co-purchase for behavioural signals, popularity and recency for cold users, and business rules for merchandising. Union the sources.\n\nRanking scores those hundreds with a heavier model using rich features \u2014 user history, item attributes, context, cross features. This is where the quality is.\n\nThen a final layer for business logic: diversity so the page is not ten of the same thing, supply constraints, freshness, and whatever the business needs.\n\nCold start is a real design constraint, not an edge case. New items have no interaction data, so content features carry them until behaviour accumulates; new users get popularity and context until you know anything about them.\n\nEvaluation is where this gets subtle. Offline ranking metrics routinely fail to predict online engagement, because your logs record what users clicked given what you showed them \u2014 the data is biased by the previous model's choices. Position bias means a click on the top slot means less than a click on the tenth. So online A/B testing is the real measurement, and offline metrics are a cheap filter for which variants deserve a test.\n\nAnd the feedback loop is the thing to design against: the model determines what gets shown, which determines what gets clicked, which becomes training data. Without deliberate exploration the system narrows onto whatever it already believed.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "senior",
+  "q": "Design the serving infrastructure for a self-hosted LLM API.",
+  "a": "\nStart with the SLOs, because they determine everything: time to first token, inter-token latency, throughput, and the cost ceiling. Those are different budgets and optimising one hurts another.\n\nThe core insight is that prefill and decode have different characteristics. Prefill processes the whole prompt at once and is compute-bound. Decode generates one token at a time and is memory-bandwidth-bound \u2014 each token requires reading the whole model from memory. Batching helps decode enormously and helps prefill less, which is why continuous batching, where finished sequences leave the batch and new ones join mid-flight rather than waiting for the slowest member, is usually the single largest throughput win available.\n\nMemory is the binding constraint: model weights plus KV cache, and the cache grows with batch size and context length. That product determines maximum concurrency, so I would compute it explicitly rather than discover it under load. Paged attention reduces the fragmentation waste substantially.\n\nThen: quantisation to fit more in memory, with a measured quality check rather than an assumption; speculative decoding for latency on interactive paths; prefix caching so shared system prompts are not recomputed per request.\n\nOperationally: admission control and queueing with explicit backpressure rather than unbounded queues, separate pools for interactive and batch traffic so a long batch job cannot starve a chat request, per-tenant rate limiting, and pinned model versions with a canary path.\n\nObservability: tokens in and out per request, time to first token, inter-token latency, batch occupancy, KV cache utilisation, and queue depth. Cache utilisation and queue depth are the two that tell you why latency moved.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "How would you design an A/B test for a model change?",
+  "a": "\nDefine the primary metric before running anything, and make it the business outcome rather than the model metric \u2014 conversion, resolution rate, retention \u2014 with the model metric as a diagnostic. Pre-register guardrail metrics too, so a win on the primary that wrecks latency or complaint rate is caught.\n\nCompute the sample size from the minimum effect worth detecting. If the test cannot detect the size of effect you expect, running it produces a coin flip with extra steps.\n\nRandomise at the right unit. Per-user, not per-request, whenever the experience is stateful or the user might notice inconsistency. Where the model's output affects other users \u2014 marketplaces, social feeds \u2014 per-user randomisation leaks through interference and you may need cluster randomisation.\n\nRun for whole weeks to cover day-of-week effects, and decide the duration upfront. Peeking at a running test and stopping when it looks significant inflates the false-positive rate substantially; if you want to monitor continuously, use a sequential testing method designed for it.\n\nBefore the test, run the new model in shadow on live traffic to catch operational problems without exposing anyone. Afterwards, check the segments \u2014 an average win can hide a large regression for a minority of users.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "senior",
+  "q": "Design an ML platform for a 50-person engineering org. What do you build first?",
+  "a": "\nI would not start from a component list. I would measure the current time from \"I have an idea\" to \"I have a trained model with a trustworthy metric,\" find the longest pole, and remove it. That number is the thing a platform exists to reduce.\n\nIn most organisations at that size the longest pole is data access and reproducibility, not training infrastructure. So the first things are usually: a consistent way to get a versioned dataset, an experiment tracker so results are comparable and findable, and containerised training that runs identically on a laptop and on a cluster.\n\nSecond wave: a model registry with lineage, so you can answer \"what data and code produced the artefact currently in production\" \u2014 which is the question every incident asks. Then a feature store, but only if you actually have the train/serve skew problem it solves; adopting one prematurely is a common and expensive mistake.\n\nThird: standardised serving, evaluation in CI, and monitoring.\n\nThe principle I would hold to is that a platform is judged by adoption, not by architecture. A paved road people choose over their own scripts is worth more than a comprehensive system they route around. So I would build the smallest thing that removes the current worst pain, make it obviously better than the alternative, and expand from usage rather than from a roadmap.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "A stakeholder wants an LLM feature shipped in two weeks. How do you scope it?",
+  "a": "\nI would find out what \"done\" means before agreeing to anything, because the failure mode here is shipping something that demos and cannot be maintained.\n\nFirst: what does success look like as a measurable thing, and what is the cost of a wrong answer? A feature where errors are embarrassing and a feature where errors are expensive are different projects.\n\nThen I would scope to the narrowest slice that is genuinely useful \u2014 one document type, one user segment, one question category \u2014 rather than a broad shallow version. A narrow feature that works builds trust; a broad one that half-works does not.\n\nIn two weeks I would spend the first two days building an evaluation set of 50 real examples, because without it the remaining eight days are unmeasurable. Then the simplest architecture that could work: prompt first, retrieval only if the task actually needs knowledge the model lacks.\n\nAnd I would name explicitly what is deferred: fine-tuning, agentic flows, broad coverage. Deferred is fine; undiscussed is not.\n\nSTRONG: builds the evaluation set first even under time pressure, and can articulate why that is faster overall rather than slower.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "How do you handle a model that must serve both batch and real-time predictions?",
+  "a": "\nThe core risk is that the two paths compute features differently and drift apart. That is training-serving skew, and it produces a model that scores well offline and badly online for reasons that take weeks to find.\n\nThe structural answer is a single feature definition used by both paths \u2014 a feature store, or at minimum shared library code with tests asserting that batch and online computation agree on the same inputs. I would make that agreement an automated test, not a convention.\n\nThen the two paths differ in what they optimise. Batch runs on a schedule, can use expensive features that require joins over history, and is graded on throughput. Real time has a latency budget, can only use features available within it, and needs precomputed aggregates rather than on-the-fly joins.\n\nWhere a feature is genuinely unavailable in real time, that is a modelling constraint to accept explicitly, not something to paper over \u2014 train the online model without it rather than training with it and hoping.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "senior",
+  "q": "Your inference costs tripled after a successful launch. What do you do?",
+  "a": "\nInstrument before cutting, because the intuitive answer is often wrong.\n\nBreak down cost per request into its parts: input tokens, output tokens, retrieval, reranking, and any retries. Then segment by use case. Almost always a small number of request types dominate, and a chunk of the bill is retries and failures producing no value at all.\n\nThen, in rough order of return:\n\nRouting. Most requests do not need the largest model. Classify by difficulty and send the easy majority to something cheaper, with the eval suite confirming quality holds. This is usually the biggest single win.\n\nPrompt caching. A long static system prompt re-sent on every request is billed every time unless cached. On a chat product this alone can be a large fraction of spend.\n\nContext size. Retrieving ten chunks when five perform identically doubles input cost for nothing. Measure the recall curve and cut.\n\nOutput length. Capping verbosity where the product does not need it is directly proportional savings.\n\nCaching answers for repeated questions, which on support-style products is a meaningful share of traffic.\n\nThen reframe the metric: cost per successful outcome, not cost per request. A cheaper model that fails more often and triggers retries or escalations can cost more overall, and only the outcome-denominated number shows that.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "How would you build a system that summarises 10,000 documents daily?",
+  "a": "\nThis is a batch problem, not an interactive one, and that changes every decision.\n\nUse the batch or asynchronous API tier if the provider offers one, since it is substantially cheaper for work with no latency requirement. Process overnight, not on demand.\n\nDeduplicate first. A meaningful fraction of daily document volume is usually near-identical to something already processed, and hashing plus near-duplicate detection removes that cost entirely.\n\nFor documents longer than the context window, map-reduce: summarise sections, then summarise the summaries, keeping the intermediate results so a failure does not redo everything.\n\nDesign for partial failure, because at 10,000 units a day some will fail. Idempotent processing keyed by content hash, a dead-letter queue, and retries with backoff. The pipeline should be resumable rather than restartable.\n\nQuality: a sampled evaluation rather than judging every output \u2014 a few dozen a day scored against a rubric is enough to detect regression. And a cheap programmatic check on all of them: length bounds, non-empty, no refusal text, expected language.\n\nCost control: measure cost per document, track it daily, and alert on it moving. It is the number that tells you the input distribution changed.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "senior",
+  "q": "Design a multi-tenant LLM application where tenants have isolated data.",
+  "a": "\nIsolation has to be structural, because any scheme that depends on every query being constructed correctly will eventually fail, and the failure is a data breach that looks like a normal response.\n\nData layer: separate vector index namespaces or entirely separate indexes per tenant. This makes cross-tenant retrieval physically impossible rather than a matter of getting the filter right. Tenant identity comes from the authenticated session and is threaded through as a first-class parameter, never taken from anything the client can set.\n\nEnforcement in the data layer rather than the application layer, so no code path can omit it. And an automated test on every commit that attempts retrieval as tenant A for a document owned only by tenant B.\n\nCaching is the subtle one. Any cache key that omits tenant id can serve one tenant's content to another, and this is easy to introduce accidentally when adding a cache later. Tenant id belongs in every key.\n\nPrompts: never place one tenant's content in another's context, including few-shot examples drawn from production data \u2014 that is a quiet and common leak.\n\nModel layer: if you fine-tune, a shared fine-tune on pooled tenant data leaks knowledge between them by construction. Per-tenant adapters or no fine-tuning on tenant data at all.\n\nOperationally: per-tenant rate limits and cost attribution so one tenant cannot starve or bankrupt you, and logs that are themselves tenant-scoped, since a support engineer reading logs is another path for data to cross the boundary.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "How do you decide between fine-tuning and prompting with retrieval?",
+  "a": "\nBy what is actually failing, which means looking at the errors rather than choosing an architecture first.\n\nIf the model produces the right content in the wrong shape \u2014 format, tone, length, structure, a domain style \u2014 that is a behaviour problem and fine-tuning addresses it well.\n\nIf the model does not know something, that is a knowledge problem and retrieval addresses it. Fine-tuning is a poor and expensive way to install facts, and the characteristic failure of trying is a model that is confidently wrong in exactly the right tone.\n\nThe order I would work in: prompt properly first, with few-shot examples, because it costs hours rather than weeks and frequently suffices. Then retrieval if knowledge is missing. Then fine-tuning, and only with an evaluation set that can prove it helped and a plan for what happens when the base model you fine-tuned is deprecated.\n\nThe costs people forget: fine-tuning creates an artefact you now own and must re-do when the base model moves, it can degrade general instruction-following, and it needs enough high-quality examples that data collection is usually the real project.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "mid",
+  "q": "What would you monitor for a deployed LLM feature?",
+  "a": "\nConventional service metrics first \u2014 latency percentiles, error rate, saturation \u2014 but those only tell you the service responded, not that it responded well.\n\nQuality signals are the ones that matter and the ones teams skip. Automated: run the evaluation suite against production traffic samples on a schedule. Implicit: thumbs up and down, whether users clicked citations, whether they immediately rephrased and asked again, escalation to a human, and task completion. A rephrase right after an answer is one of the strongest available signals that the answer was bad.\n\nInput distribution: query length and topic mix. When the traffic changes, quality changes, and knowing which came first saves an investigation.\n\nCost: tokens in and out per request, cost per successful outcome, and retry rate.\n\nSafety: refusal rate, flagged content rate, and injection-detection hits. A refusal rate that jumps usually means something upstream changed.\n\nTraces: one request id should reconstruct every model call, every retrieved document, token counts and latency per stage. Without that, incident review is guesswork.\n"
+ },
+ {
+  "track": "system-design",
+  "level": "senior",
+  "q": "How would you migrate from one embedding model to another with no downtime?",
+  "a": "\nThe constraint is that vectors from different models are not comparable, so you cannot mix them in one index and you cannot do it incrementally within a single index.\n\nBuild the new index alongside the old one. Run the ingestion pipeline with the new model over the whole corpus, writing to a new namespace, while the old index continues serving. This is the expensive part \u2014 full re-embedding \u2014 and it is why embedding model choice has real switching costs.\n\nWhile building, dual-write new and updated documents to both indexes so the new one does not fall behind during a build that may take days.\n\nBefore switching, evaluate: run the golden set against both indexes and compare recall@k. This is the step that justifies the migration or cancels it, and it requires the golden set to already exist.\n\nThen shift traffic gradually \u2014 a small percentage, compare online quality signals, increase. Keep the old index warm until you are confident, because rollback is only cheap while it exists.\n\nAfterwards, delete the old index deliberately and verify the storage is reclaimed, since a forgotten index is a large recurring bill.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "junior",
+  "q": "What does it mean for a training run to be reproducible?",
+  "a": "\nSomeone else, on a different machine, can get the same metric from the same starting point. That requires more than setting a seed.\n\nYou need the code version, the exact dependency versions including CUDA and framework builds, the data version, the hyperparameters, and the seed \u2014 and you need the environment captured, usually as a container image, because a framework minor version can change numerics.\n\nFull bit-level determinism on GPU additionally requires disabling non-deterministic kernels and fixing the dataloader ordering, and it costs performance. In practice most teams aim for statistical reproducibility \u2014 the metric lands within a known variance \u2014 and that is usually the right trade, provided you know what that variance is.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "What is training-serving skew and how do you detect it?",
+  "a": "\nThe features the model sees in production differ from those it was trained on, even though both are nominally the same feature. It is the most common cause of a model that looks good offline and disappoints online.\n\nIt happens because the two paths are usually written twice: a batch SQL or Spark job for training, and application code for serving. They diverge on null handling, on time zones, on rounding, on whether a window is inclusive, on default values.\n\nDetection is more direct than people expect: log the actual feature vector used at inference, then recompute those features offline for the same entities and timestamps and diff them. Any non-trivial mismatch rate is the bug. Make that a scheduled job, not a one-off investigation.\n\nPrevention is to have one definition rather than two \u2014 a feature store or shared library \u2014 plus a test asserting both paths agree on the same inputs.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "How do you monitor a model for drift?",
+  "a": "\nThree distinct things get called drift and they need different responses.\n\nData drift: the input distribution moved. Detect per feature with a distributional test or population stability index, and watch for schema changes and null-rate jumps, which are usually pipeline breakage rather than genuine drift.\n\nConcept drift: the relationship between inputs and the target moved, so the same input should now produce a different answer. Inputs can look completely stable while this happens, so input monitoring will not catch it. You need outcomes.\n\nPrediction drift: the output distribution moved. Cheap to compute, available immediately, and a useful leading indicator of either of the above.\n\nThe honest caveat is that drift alerts are noisy and mostly do not require action. What you actually want is the delayed ground-truth metric, and drift monitoring is what you watch in the meantime. So I would alert on drift as a signal to investigate, and page only on the outcome metric.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "senior",
+  "q": "Walk me through deploying a new model version safely.",
+  "a": "\nOffline gate first: the evaluation suite must pass, including segment-level checks, because an average improvement can conceal a regression for a minority of users.\n\nShadow next. Send real production traffic to the new model without using its output. This catches operational problems \u2014 latency, memory, malformed inputs, dependency issues \u2014 and lets you compare predictions on live data at zero user risk. It is the highest-value step and the most often skipped.\n\nThen canary: a small traffic percentage, with automatic rollback wired to guardrail metrics rather than to someone watching a dashboard. Increase in stages with a soak period at each.\n\nThroughout: the model version is a config value, not a rebuild, so rollback is a flag flip in under a minute rather than a redeploy. And rollback must be rehearsed \u2014 a procedure nobody has executed is a hypothesis.\n\nAfterwards: keep the previous artefact warm for a defined window, and record what data and code produced the deployed artefact so an incident can answer that question immediately.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "What belongs in a model registry?",
+  "a": "\nThe artefact itself, versioned and immutable, plus everything needed to answer \"where did this come from and can I trust it.\"\n\nThat means: the training code commit, the dataset version, the full hyperparameter set, the environment or container digest, the evaluation results at the time of registration, and the lineage linking to the run that produced it. Plus stage \u2014 staging, production, archived \u2014 and who approved the promotion.\n\nThe test of whether your registry is adequate is an incident question: production is misbehaving, and you need to know in under a minute which artefact is live, what produced it, what it scored, and what the previous version was. If answering that requires asking a person, the registry is not doing its job.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "How do you version datasets?",
+  "a": "\nContent-address them. Hash the data and refer to it by that hash, so a dataset reference is unambiguous and a change is detectable rather than assumed.\n\nFor files, tools that store hashes in git alongside the code while keeping the bytes in object storage give you the property you want: checking out a commit gets you the exact data that commit was written against. For table-based data, formats with snapshot and time-travel support let you pin a query to a point in time.\n\nThe specific thing to avoid is a mutable path \u2014 a folder that gets overwritten weekly \u2014 because then the same code and the same commit produce different results at different times and nothing is reproducible.\n\nAnd the derived artefacts matter too: the preprocessing code version is part of the dataset identity, since the same raw data through different preprocessing is a different dataset.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "senior",
+  "q": "Your model's performance degraded but inputs look unchanged. What now?",
+  "a": "\nStable inputs with degraded outcomes points at concept drift or at something outside the model.\n\nFirst I would check whether the degradation is real or measurement. Did the label pipeline change? Did the delay between prediction and ground truth shift, so recent periods look worse purely because outcomes have not landed yet? That artefact is common and wastes a lot of investigation.\n\nThen genuine concept drift: the world changed, so the same features now imply a different outcome. Competitor behaviour, a pricing change, a seasonal effect the training window did not cover, a policy change upstream. Segment the metric by time and by cohort to find where the break is \u2014 a sharp break points at an event, a gradual slide at genuine drift.\n\nThen the feedback loop: is the model's own output changing the data it is scored on? In ranking and fraud this is guaranteed, and the effect can look like degradation while being a consequence of the model working.\n\nThen the boring causes, which are more likely than they sound: a silently failing upstream service filling a feature with defaults, a model artefact that did not actually update, a preprocessing version mismatch.\n\nThe fix is usually retraining on recent data, but I would want to know which of these it was first, because retraining on data corrupted by a broken pipeline makes things worse.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "What is a feature store and do you actually need one?",
+  "a": "\nA system holding feature definitions and values with two interfaces: a batch one for generating training data with point-in-time correctness, and a low-latency one for serving. The point-in-time correctness is the real content \u2014 it means a training row for time T sees only feature values that existed at time T, which is what prevents temporal leakage.\n\nYou need one when you have the problems it solves: several models sharing features, genuine train/serve skew, and non-trivial point-in-time joins. Those are real problems and a feature store is a good answer to them.\n\nYou do not need one when you have one model, features computed in one place, and no online serving. Adopting a feature store early is a common and expensive mistake \u2014 it is a substantial piece of infrastructure to operate, and without the problems it solves it is pure overhead.\n\nThe honest test: can you articulate which of the three problems you currently have? If not, shared library code with tests is the better answer today.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "How would you test ML code?",
+  "a": "\nThe same way as other code, plus the parts that are specific to this domain.\n\nOrdinary unit tests for the deterministic pieces: preprocessing, feature computation, the data loader, the serialisation. These are just functions and they deserve normal tests.\n\nShape and invariant tests for the model code: output shapes, that the loss decreases on a fixed batch, that gradients are non-zero where they should be and zero where they should not.\n\nThe single best ML-specific test is overfitting a tiny batch, run in CI with a step limit. It fails loudly when a gradient is detached, a label is misaligned, or an optimiser is never stepped \u2014 and those bugs otherwise surface as a model that trains for hours and is mysteriously mediocre.\n\nData tests as a gate on the pipeline: schema, ranges, null rates, cardinality, and distributional checks against a reference. Most production incidents in ML are data incidents.\n\nThen behavioural tests on the trained model: known-answer cases, invariances that must hold, and directional expectations \u2014 raising this input should not lower this score. These are the tests that catch a model that is statistically fine and wrong in a way that matters.\n\nFinally, an evaluation regression gate in CI so quality cannot silently fall.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "senior",
+  "q": "How do you decide when to retrain?",
+  "a": "\nIdeally from a trigger tied to the metric you care about, not from a calendar. But the calendar has an underrated virtue, which is that it is simple and it actually happens.\n\nTrigger-based: retrain when the outcome metric drops below a threshold, or when drift crosses a level you have validated as meaningful. The difficulty is delayed labels \u2014 if ground truth arrives weeks later, a metric-based trigger is weeks late.\n\nSchedule-based: retrain at a fixed cadence chosen from how fast the domain moves. Simple, predictable, and it guards against slow degradation nobody noticed. The cost is retraining when nothing changed.\n\nIn practice most mature setups run a schedule with a trigger override, and \u2014 this is the part that matters more than the policy \u2014 every retrain goes through the same offline gate and canary as any other deployment. Automatic retraining that deploys without an evaluation gate is a mechanism for automatically shipping a worse model, and it has done real damage at real companies.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "What should you log for every LLM request?",
+  "a": "\nEnough to reconstruct the request completely, because you will need to.\n\nA request id that threads through every downstream call. The prompt template id and version, the rendered prompt or a hash of it, the model id and its exact version, the sampling parameters, input and output token counts, latency broken down by stage, and the output.\n\nFor RAG: the transformed query as well as the original, the retrieved chunk ids with their scores, and which ones made it into the final context. The transformed query in particular is invisible otherwise and is the first thing you want when an answer is baffling.\n\nFor agents: every tool call with arguments and results, and the step index.\n\nThen the handling constraints, which are not optional: prompts and completions frequently contain personal data, so you need redaction, a retention policy, and access controls on the logs themselves. A log store containing user content is a data asset with the same obligations as any other.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "How do you handle secrets and PII in an ML pipeline?",
+  "a": "\nSecrets: never in code, never in notebooks, never in environment files that get committed. A secrets manager with short-lived credentials, injected at runtime, with rotation. And scanning in CI, because the failure mode is a key in a commit from eight months ago that nobody noticed.\n\nPII: the first question is whether you need it at all, because the cheapest way to protect data is not to hold it. Then minimisation, then pseudonymisation where identity is needed only for joining, then field-level encryption at rest and access controls that are actually enforced rather than documented.\n\nFor ML specifically there are two things people miss. Models memorise: a model trained on personal data can emit it, and that is a disclosure. And logs are the leak \u2014 prompts, completions, feature values and error traces routinely contain personal data and are routinely stored with weaker controls than the database they came from.\n\nDeletion has to reach everything derived: the training set, the index, the caches, the logs. If deletion was not designed in, retrofitting it is genuinely hard and the deadline is usually legal.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "senior",
+  "q": "What is the biggest operational difference between ML systems and ordinary software?",
+  "a": "\nOrdinary software fails loudly. It throws, it 500s, it stops. ML systems fail silently and stay up \u2014 the service returns 200, the latency is fine, and the answers have quietly become worse. Every alert you have says green.\n\nThat has three consequences for how you run them.\n\nCorrectness is a distribution, not a predicate, so you cannot test it exhaustively. You sample, and you monitor continuously, because there is no state in which you have proven it right.\n\nThe system depends on data as much as on code, so a change nobody made can break it. An upstream team changing a column default is a production incident in your system with no deploy on your side.\n\nAnd degradation is gradual. There is rarely a moment where it breaks; there is a slow slide that nobody notices until a quarterly review. That is why output-quality monitoring and a scheduled evaluation suite are not nice-to-haves \u2014 they are the only thing standing between you and finding out from a customer.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "How would you set up CI for an ML project?",
+  "a": "\nFast checks on every commit, expensive ones on a schedule or on release candidates.\n\nEvery commit: linting and type checks, unit tests for preprocessing and feature code, the overfit-a-tiny-batch test with a step limit, data validation against the schema, and \u2014 for LLM projects \u2014 the programmatic checks and a small deterministic prompt regression suite. All of that should run in a few minutes.\n\nOn pull requests touching model code or prompts: the retrieval metrics and the cheaper evaluation set, with the results posted to the PR so a reviewer sees the quality delta alongside the diff. Failing the build on a regression is the point.\n\nNightly or on release candidate: the full evaluation suite including judge-based scoring, plus a smoke deployment.\n\nThe thing that makes this work is determinism: pin every dependency, fix seeds, and make the evaluation set immutable and versioned. A flaky quality gate gets disabled within two weeks, and then you have nothing.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "mid",
+  "q": "What is shadow deployment and why is it valuable?",
+  "a": "\nSend real production traffic to the new model in parallel with the old one, but discard the new model's output and serve the old one's. Compare afterwards.\n\nIt is valuable because it is the only way to see how a model behaves on real traffic at real volume without any user risk. Offline evaluation uses a fixed sample that was curated; production traffic contains the malformed inputs, the unusual lengths, the encodings and the edge cases nobody thought to put in the test set.\n\nIt also catches the operational problems that offline evaluation structurally cannot: memory growth under sustained load, latency at the tail, dependency timeouts, and throughput limits.\n\nThe cost is running both models, which for large ones is real. Sampling a percentage of traffic rather than all of it usually gives you what you need.\n"
+ },
+ {
+  "track": "mlops",
+  "level": "senior",
+  "q": "How do you attribute an increase in LLM spend to a cause?",
+  "a": "\nYou cannot, unless you instrumented for it beforehand \u2014 so the real answer is what you put in place before the question arises.\n\nEvery request should emit: input tokens, output tokens, model id, feature or endpoint name, tenant, whether it was a retry, and whether the outcome was successful. With those dimensions, an increase decomposes immediately.\n\nThen the decomposition tells you which cause it is. More requests is growth. More tokens per request means prompts or contexts grew \u2014 often a retrieval change that raised the chunk count, or a system prompt that someone extended. A shift in model mix means routing changed or a fallback is firing more often. A rise in retries means something is failing and being paid for twice. And a rise in cost per successful outcome with flat cost per request means quality dropped and users are asking again.\n\nThat last one is the case people miss entirely, which is the argument for denominating cost by outcome rather than by request.\n"
+ },
+ {
+  "track": "coding",
+  "level": "junior",
+  "q": "Write a numerically stable softmax. Why is the naive version wrong?",
+  "a": "\nThe naive version exponentiates the raw logits, and exp overflows to infinity for inputs around 710 in float64 and far sooner in float32. Infinity divided by infinity is NaN, and your loss becomes NaN.\n\nSubtracting the maximum before exponentiating leaves the result mathematically unchanged \u2014 the constant cancels between numerator and denominator \u2014 while guaranteeing the largest exponent is exp(0) = 1.\n\nPRE:def softmax(x, axis=-1):\n    x = x - np.max(x, axis=axis, keepdims=True)   # the whole trick\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\nIn practice you use the framework's fused softmax-cross-entropy rather than composing them yourself, precisely because the fused version never materialises the probabilities and is more stable still.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "Given a matrix of embeddings, find the k nearest to a query. Then make it fast.",
+  "a": "\nFor unit vectors, cosine similarity and dot product are the same thing, so normalise once and take a single matrix multiply.\n\nPRE:def top_k(query, matrix, k=10):\n    q = query / np.linalg.norm(query)\n    m = matrix / np.linalg.norm(matrix, axis=1, keepdims=True)\n    scores = m @ q                           # one matmul, not a loop\n    idx = np.argpartition(-scores, k)[:k]    # O(n), not O(n log n)\n    return idx[np.argsort(-scores[idx])]     # order just the k\n\nTwo things are being tested here. Vectorise \u2014 a Python loop over rows is orders of magnitude slower than one matmul. And use argpartition rather than a full sort, because you need the top k, not a total ordering.\n\nBeyond that: precompute the normalisation at index time rather than per query, store float32, and past a few hundred thousand vectors move to an approximate index, since exact search is linear and will not hold.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "How would you deduplicate 10 million documents efficiently?",
+  "a": "\nTwo different problems needing different tools.\n\nExact duplicates: hash the normalised content and group. Linear, trivially parallel, and it removes the bulk of real-world duplication.\n\nNear duplicates: pairwise comparison is 10^14 operations and impossible. MinHash with locality-sensitive hashing is the standard answer \u2014 shingle each document, compute a signature, band the signature so similar documents collide in at least one band, and only compare within buckets. Quadratic becomes near-linear, with a tunable trade-off between catching true duplicates and the number of candidate pairs you must check.\n\nFor semantic near-duplicates, cluster embeddings instead \u2014 but that is a different notion of duplicate, and it will group documents saying the same thing in entirely different words, which may or may not be what you want.\n\nThe detail that matters most in practice: normalise first. Whitespace, case, punctuation, boilerplate headers. Most \"near duplicates\" in a real corpus are exact duplicates wearing different formatting.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "Write SQL that produces a point-in-time-correct training label.",
+  "a": "\nEvery feature value must be one that existed at the row's prediction time, and the label must be an outcome strictly after it.\n\nPRE:-- Churn label: did the customer cancel in the 30 days AFTER the\n-- feature snapshot? Features may use only data up to as_of.\nWITH features AS (\n  SELECT s.customer_id, s.as_of,\n         COUNT(o.id)   AS orders_prior,\n         SUM(o.amount) AS spend_prior\n  FROM prediction_dates s\n  LEFT JOIN orders o\n    ON  o.customer_id = s.customer_id\n    AND o.created_at  < s.as_of            -- strictly before\n  GROUP BY s.customer_id, s.as_of\n)\nSELECT f.*,\n       MAX(CASE WHEN c.cancelled_at >= f.as_of\n                 AND c.cancelled_at <  f.as_of + INTERVAL '30 days'\n                THEN 1 ELSE 0 END) AS churned_30d\nFROM features f\nLEFT JOIN cancellations c ON c.customer_id = f.customer_id\nGROUP BY f.customer_id, f.as_of, f.orders_prior, f.spend_prior;\n\nTwo things make it correct: the strict inequality on the feature join, and a label window entirely after as_of. Getting either wrong produces a model with a wonderful offline score and no production value.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "Your pandas job takes 40 minutes. How do you speed it up?",
+  "a": "\nProfile first, because the bottleneck is rarely where people assume.\n\nThen in rough order of typical return: stop iterating \u2014 iterrows and row-wise apply are the usual culprits and vectorised operations are often a hundred times faster. Use categorical dtypes for low-cardinality strings, which frequently cuts memory by an order of magnitude and speeds up groupby. Read only the columns you need, from a columnar format \u2014 Parquet rather than CSV \u2014 which also removes type inference. Downcast numerics where the range allows. Set an index before repeated joins on the same key.\n\nIf it is still slow, the data probably does not comfortably fit in memory, and that is a signal to change tool rather than keep optimising: Polars for single-machine speed, DuckDB for SQL over larger-than-memory files, a distributed engine if it genuinely is that large.\n\nThe meta-answer worth giving: 40 minutes is a feedback-loop problem as much as a compute problem. Getting it under a minute changes how many experiments you run this week, and that affects final model quality more than most modelling decisions do.\n"
+ },
+ {
+  "track": "coding",
+  "level": "senior",
+  "q": "Implement retry with exponential backoff for an LLM API. What are the traps?",
+  "a": "\nPRE:import random, time\n\ndef call_with_retry(fn, attempts=5, base=0.5, cap=30.0):\n    for i in range(attempts):\n        try:\n            return fn()\n        except BadRequest:\n            raise                     # deterministic: never retry\n        except RateLimited as e:\n            if i == attempts - 1:\n                raise\n            # honour the server's own guidance when it gives any\n            wait = getattr(e, \"retry_after\", None)\n            if wait is None:\n                # full jitter: spreads retries instead of re-synchronising\n                wait = random.uniform(0, min(cap, base * 2 ** i))\n            time.sleep(wait)\n\nThe traps, ordered by how often they cause real incidents:\n\nRetrying non-retryable errors. A malformed request fails identically five times; you have paid the latency and possibly the tokens for nothing.\n\nNo jitter. Every client backs off by the same amount and they all return together, re-synchronising the thundering herd that caused the rate limit.\n\nIgnoring Retry-After. The server told you when to come back; guessing is strictly worse.\n\nUnbounded retries with no overall deadline, which turns a transient dependency blip into cascading timeouts upstream.\n\nRetrying non-idempotent operations \u2014 for LLM calls that means paying twice, and performing a side effect twice if tools were involved.\n\nAnd no circuit breaker: when a dependency is genuinely down, retrying makes it worse for everyone and delays its recovery.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "How would you stream tokens from an LLM to a browser?",
+  "a": "\nServer-sent events are the natural fit: one-directional, plain HTTP, with reconnection built into the browser's EventSource. WebSockets are right only if the client needs to send data mid-stream.\n\nThe parts that actually cause problems:\n\nBuffering. A proxy, load balancer or framework response buffer will hold the whole response and deliver it at once, silently defeating streaming. Disabling buffering at every hop is usually the entire debugging story.\n\nCancellation. If the user closes the tab you must stop generating, or you pay for tokens nobody receives. Wire the client disconnect through to cancelling the upstream request.\n\nPartial parsing. Streaming structured output means the client sees invalid JSON for most of the stream, so either stream prose and parse at the end, or use a format designed for incremental parsing.\n\nMid-stream errors. Once you have sent a 200 and begun streaming you cannot change the status code, so you need an in-band error event and a client that handles it.\n\nAnd time to first token is the number users actually feel, so it deserves its own metric separate from total latency.\n"
+ },
+ {
+  "track": "coding",
+  "level": "junior",
+  "q": "What is the difference between a generator and a list in Python, and when does it matter in ML?",
+  "a": "\nA list materialises every element in memory. A generator produces them one at a time and holds only the current one.\n\nIn ML that matters constantly: reading a large file, streaming a dataset, or building a data loader over more data than fits in RAM. A list comprehension over ten million rows exhausts memory where a generator expression does not.\n\nThe trade-offs to know: a generator is consumed once, has no length, and cannot be indexed. Since training needs multiple passes, you need something re-iterable rather than a bare generator \u2014 which is exactly why dataset abstractions exist instead of raw generators.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "Given imbalanced data, how would you construct training batches?",
+  "a": "\nFirst I would question whether to intervene at all, because often the answer is no. Many models handle imbalance adequately, and resampling changes the base rate, which decalibrates the output \u2014 the scores stop meaning what they say. If anything downstream uses the probability, that is a real cost.\n\nIf I do intervene: class weighting in the loss is least invasive, since it changes the gradient without changing the data distribution as much. Oversampling the minority risks memorising the repeated examples. Undersampling the majority discards information, though it is cheap and sometimes fine.\n\nFor extreme imbalance, hard negative mining \u2014 sampling the negatives the model currently finds hardest rather than uniformly \u2014 is usually far more effective than tuning ratios, because most negatives are trivially easy and contribute nothing to the gradient.\n\nWhatever I do, I evaluate on the true distribution rather than the resampled one, and recalibrate afterwards if the base rate changed.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "Write a function that chunks text with overlap, respecting sentence boundaries.",
+  "a": "\nPRE:def chunk(text, size=500, overlap=50):\n    # Greedy sentence packing. Never splits mid-sentence; the overlap is\n    # whole sentences, so a boundary cannot orphan a qualifier.\n    sents = split_sentences(text)\n    chunks, cur, cur_len = [], [], 0\n\n    for s in sents:\n        n = len(s.split())\n        if cur and cur_len + n > size:\n            chunks.append(\" \".join(cur))\n            back, taken = [], 0\n            for prev in reversed(cur):        # carry back whole sentences\n                if taken >= overlap:\n                    break\n                back.insert(0, prev)\n                taken += len(prev.split())\n            cur, cur_len = back, taken\n        cur.append(s)\n        cur_len += n\n\n    if cur:\n        chunks.append(\" \".join(cur))\n    return chunks\n\nThree things this gets right that naive versions do not: it never splits a sentence; the overlap is whole sentences rather than an arbitrary character window; and a single sentence longer than the size limit still emits instead of looping forever.\n\nIn production I would count tokens rather than words, because the embedding model's limit is in tokens and silent truncation is a real and invisible failure mode.\n"
+ },
+ {
+  "track": "coding",
+  "level": "senior",
+  "q": "How would you parallelise embedding 10 million documents?",
+  "a": "\nThe work is either I/O-bound against an API or GPU-bound locally, and those parallelise differently.\n\nAgainst an API: batch aggressively, since per-request overhead dominates and most endpoints accept many texts per call. Then a bounded worker pool sized to the rate limit rather than to your core count \u2014 the constraint is the provider's quota, not your machine. Async I/O rather than threads, because the work is waiting.\n\nLocally on GPU: batch to fill the device, and sort by length before batching so padding is not wasted compute.\n\nEither way, the parts that make it survivable at ten million: checkpoint progress so a failure resumes rather than restarts; key work by content hash so reruns skip what is done; write results incrementally rather than accumulating in memory; and send failures to a dead-letter queue instead of halting the run.\n\nAnd measure cost on a sample before launching the full job, because discovering the rate after processing ten million documents is an expensive way to learn it.\n"
+ },
+ {
+  "track": "coding",
+  "level": "mid",
+  "q": "What is the practical difference between float32 and float64 in ML?",
+  "a": "\nfloat64 carries about 15\u201316 significant decimal digits, float32 about 7. For machine learning float32 is almost always sufficient and is every framework's default, because the gradient noise from stochastic training dwarfs the rounding error.\n\nThe practical differences are memory and speed: float32 halves the memory, which means larger batches, and lower-precision arithmetic throughput on GPUs is substantially higher. That is the entire reason mixed precision exists.\n\nWhere float64 still matters: long accumulations, metrics computed over very large datasets where error compounds, and some classical routines that are genuinely ill-conditioned. A common real bug is averaging millions of float32 values and getting a visibly wrong answer because the accumulator saturated \u2014 accumulate in float64 even when the data is float32.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "mid",
+  "q": "Tell me about a model you built that did not work. What happened?",
+  "a": "\nThe interviewer is testing whether you can diagnose honestly, not whether you have a clean record. Everyone has failures; not everyone learned from them.\n\nA good answer has four parts. What you were trying to do and why it mattered. What actually went wrong, stated specifically \u2014 \"the offline AUC did not transfer because a feature leaked the label through an aggregation computed after the event\" is an answer; \"it did not generalise\" is not. How you found out, which is where diagnostic skill shows. And what you changed afterwards, in your process rather than just in that model.\n\nWEAK: blames the data, the stakeholders, or the deadline, and describes no diagnostic steps.\n\nSTRONG: names the specific defect and the specific signal that revealed it, and identifies a practice they adopted afterwards \u2014 usually a check that would have caught it earlier.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "senior",
+  "q": "Tell me about a time you decided not to use machine learning.",
+  "a": "\nA genuinely senior answer, because the instinct to reach for a model is what the question is probing.\n\nGood versions involve: a rules-based system that handled the case with less operational burden and full explainability; a data-quality fix that removed the problem the model was meant to work around; a heuristic that got 90% of the value for 2% of the cost; or realising the actual constraint was a business process rather than a prediction.\n\nWhat makes it strong is the reasoning, not the decision. Name what a model would have cost \u2014 build time, serving cost, monitoring burden, the ongoing obligation to maintain it \u2014 against what it would have added, and show you compared them rather than defaulting.\n\nSTRONG: mentions the ongoing maintenance cost of a model, which is the part that is invisible at decision time and dominates over a few years.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "mid",
+  "q": "How do you explain a model's limitations to a non-technical stakeholder?",
+  "a": "\nIn terms of decisions and consequences, not metrics.\n\nRather than \"precision is 0.72\", say \"out of every ten cases we flag, about seven are real and three are not, so plan for someone to review them.\" Rather than \"the model may not generalise\", say \"this was trained on last year's customers; if the mix changes substantially we should expect it to get worse, and here is the monitor that would tell us.\"\n\nTwo things to do explicitly. State what the model cannot do at all, early and plainly, because unstated limits become assumed capabilities. And give the failure modes a shape \u2014 what a wrong answer will look like when it happens \u2014 so people recognise one rather than trusting output uniformly.\n\nThe trust you are building is not \"this works\"; it is \"this person tells me when it does not.\"\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "senior",
+  "q": "A stakeholder wants a model you believe will not work. What do you do?",
+  "a": "\nFind out whether I am right before arguing, because I might not be.\n\nI would first make sure I understand the actual goal rather than the proposed solution \u2014 often the request is a solution someone has already chosen, and the underlying need has a different and better answer.\n\nIf I still believe it will not work, I would say so plainly and once, with the specific reason: the label does not exist, the data volume cannot support it, the signal is not in the features, the latency budget rules it out. Then I would propose the cheapest experiment that would settle it. A week of work that produces a definitive answer is far better than a month of disagreement, and it converts an argument about opinions into a question about evidence.\n\nAnd if the experiment says I was wrong, I say so and build it. If it says I was right, I have evidence rather than a position, and the conversation is about what to do instead.\n\nSTRONG: proposes a cheap decisive experiment rather than either capitulating or digging in, and is explicit about being willing to be wrong.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "mid",
+  "q": "How do you prioritise when everything is urgent?",
+  "a": "\nBy expected value over effort, made explicit rather than held in my head.\n\nFor each item: what does it unblock, what does it cost if delayed, how confident am I in both, and how much work is it. Writing that down usually collapses the list, because two or three items dominate and the rest were urgent only in tone.\n\nThe specific thing I look for in ML work is the difference between things that are urgent and things that compound. An evaluation harness is rarely the most urgent item and is almost always the highest-leverage one, because everything after it goes faster and more safely. Deferring compounding work to service urgent work is how teams end up slow.\n\nThen I would take the ranking to whoever owns the trade-off rather than deciding silently, because prioritisation across stakeholders is usually their decision informed by my estimates, not mine.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "senior",
+  "q": "Describe a time you disagreed with a technical decision. How did it resolve?",
+  "a": "\nThe interviewer is testing whether you can disagree productively and whether you can be wrong gracefully.\n\nA strong answer shows: you understood the other position well enough to state it fairly; you argued from consequences rather than preference; you looked for the cheapest way to get evidence; and you committed fully once the decision was made, even if it went against you.\n\nThe best versions include a case where you turned out to be wrong, and what you learned about your own reasoning from it.\n\nWEAK: a story where the speaker was right, everyone else was foolish, and the resolution was that they were eventually vindicated.\n\nSTRONG: describes disagreeing, losing, committing anyway, and either being proven wrong or flagging the risk in a way that made it cheap to reverse later.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "mid",
+  "q": "How do you keep up with a field that moves this fast?",
+  "a": "\nSelectively, and with a filter, because trying to read everything is how people end up knowing about many things and understanding none.\n\nWhat I find works: follow a small number of people whose judgement has been good, rather than following volume. Read the paper only when something has survived a few months of scrutiny, since most results do not. Prioritise things that change how systems are built over things that change a benchmark by a point.\n\nAnd the part that matters most: implement occasionally rather than only reading. Reproducing one technique teaches more than reading twenty summaries, and it also calibrates you on how often reported results do not transfer.\n\nI would also say plainly that fundamentals move slowly. Attention, evaluation, distribution shift and cost structure have been the same problems for years, and time spent there compounds in a way that tracking releases does not.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "senior",
+  "q": "How do you decide what to measure when the business goal is vague?",
+  "a": "\nBy forcing the vagueness into a decision, because a metric only exists to change what someone does.\n\nI would ask what action would be taken differently depending on the number. If nobody can answer that, the metric is decoration and I would push back on building it.\n\nThen I would separate the layers. The business outcome is the thing that actually matters and is usually slow and noisy \u2014 revenue, retention, resolution rate. A proxy metric is faster and correlates with it, and I would want stated evidence for that correlation rather than an assumption. Then diagnostic metrics explain movements in the proxy.\n\nI would also name the ways the proxy can be gamed, at the point of choosing it. Every proxy is optimisable in ways that do not help the outcome, and saying so upfront is much cheaper than discovering it after two quarters of optimisation.\n\nSTRONG: insists on naming the decision the metric informs, and identifies how the proxy could improve while the real outcome does not.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "mid",
+  "q": "What would you do in your first 30 days on a new ML team?",
+  "a": "\nMostly listen and measure, because the highest-value thing early is an accurate picture rather than an early win.\n\nWeek one: understand what the models do for the business, who depends on them, and what breaks most often. Read the incident history \u2014 it tells you more about a system's real state than any document.\n\nWeek two: reproduce something. Take an existing model, retrain it, and see whether I get the same number. That single exercise reveals the true state of reproducibility, data access, documentation and tooling faster than asking anyone.\n\nWeek three: find the slowest part of the loop from idea to measured result. That is usually where the leverage is, and it is usually not where the team thinks it is.\n\nWeek four: ship something small and useful, both to be useful and to exercise the deploy path end to end.\n\nI would deliberately avoid proposing a rearchitecture in month one. The things that look wrong from outside usually have history, and I would rather understand it before arguing with it.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "senior",
+  "q": "How do you handle a project where the data turns out to be unusable?",
+  "a": "\nEstablish it clearly and early, then say so, because the expensive failure is spending a quarter hoping.\n\nFirst I would make the claim precise and evidenced \u2014 not \"the data is bad\" but \"the label is only present for 8% of rows, and that 8% is not random because it is generated by a manual review process that only touches escalated cases.\" That specificity is what makes the conversation productive rather than demoralising.\n\nThen I would separate what is fixable from what is not. Sparse labels might be addressed with weak supervision or a proxy label. Biased collection might be addressed by changing collection going forward, which is a longer timeline but a real answer. Genuinely absent signal is not fixable by any modelling choice, and saying so is the useful contribution.\n\nThen I would bring options rather than only a problem: what could be delivered with the data that exists, what it would take to get usable data and how long, and what a non-ML answer looks like in the meantime.\n\nThe judgement being tested is whether you can kill your own project when it deserves it. Delivering the finding early is a success, even though it does not feel like one.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "mid",
+  "q": "How do you work with a team that does not trust ML?",
+  "a": "\nUsually the distrust is earned, so I would start by finding out what happened. A model that was oversold, shipped without monitoring, or produced a visible embarrassment leaves a memory, and arguing against that memory does not work.\n\nThen I would be deliberately conservative: start with something small and verifiable where a wrong answer is cheap, keep a human in the loop, and make the output inspectable so people can check it against their own judgement rather than being asked to trust it.\n\nI would also commit to saying when it is not working, and then actually do it. Trust is built by reporting a regression before anyone else notices far more than by reporting wins.\n\nAnd I would be careful about language. Promising that a model will \"understand\" or \"know\" things invites exactly the disappointment that created the distrust. Describing what it does mechanically, and what it will get wrong, sets expectations that survive contact with reality.\n"
+ },
+ {
+  "track": "behavioral",
+  "level": "senior",
+  "q": "What is the most important thing you have changed your mind about in ML?",
+  "a": "\nThere is no single correct answer, but the good ones share a shape: a specific belief, what changed it, and what it cost to learn.\n\nCommon honest examples: that model architecture matters more than data quality, until a data fix outperformed months of modelling. That offline metrics predict production behaviour. That more context or more retrieved documents is better. That fine-tuning is the natural answer to a model not knowing something. That a more capable model will fix a problem that is actually an evaluation problem.\n\nWhat makes the answer strong is the evidence that changed the mind, and the admission of what the old belief cost in time or in a bad decision. An answer with no cost attached usually means the mind was not really changed.\n\nSTRONG: names a belief they held confidently, the specific experience that broke it, and how their default behaviour differs now.\n"
+ }
+]
