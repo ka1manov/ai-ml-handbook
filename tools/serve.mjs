@@ -30,7 +30,10 @@ createServer(async (req, res) => {
       /* fall through to readFile error */
     }
     const body = await readFile(full);
-    res.writeHead(200, { 'content-type': TYPES[extname(full)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'content-type': TYPES[extname(full)] || 'application/octet-stream',
+      'cache-control': 'no-store, must-revalidate',
+    });
     res.end(body);
   } catch {
     res.writeHead(404, { 'content-type': 'text/plain' });

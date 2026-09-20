@@ -1,0 +1,17 @@
+path: articles/evaluation.html
+title: Evaluation Engineering for LLM Systems
+desc: Golden sets, task decomposition, programmatic checks before model-based ones, calibrating an LLM judge, regression suites in CI, and online evaluation.
+og: og-articles.png
+ogtype: article
+readbar: yes
+scripts: progress
+---
+<main id="main">
+<div class="shell">
+<section class="pagehead">
+<h1>Evaluation Engineering for LLM Systems</h1>
+<p class="lede">Being written.</p>
+<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+</section>
+</div>
+</main>

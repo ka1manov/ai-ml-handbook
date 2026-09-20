@@ -1,0 +1,17 @@
+path: articles/inference.html
+title: LLM Inference Economics and Serving
+desc: Prefill versus decode, KV cache arithmetic, continuous batching, quantisation and speculative decoding — where the money actually goes when you serve a language model.
+og: og-articles.png
+ogtype: article
+readbar: yes
+scripts: progress
+---
+<main id="main">
+<div class="shell">
+<section class="pagehead">
+<h1>LLM Inference Economics and Serving</h1>
+<p class="lede">Being written.</p>
+<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+</section>
+</div>
+</main>

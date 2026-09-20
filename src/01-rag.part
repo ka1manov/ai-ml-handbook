@@ -1,0 +1,17 @@
+path: rag.html
+title: RAG Systems: A Production Deep Dive
+desc: Retrieval-augmented generation end to end — chunking, embeddings, vector indexes, hybrid search, reranking, evaluation, and a failure-mode taxonomy with a diagnostic for each symptom.
+og: og-rag.png
+ogtype: article
+readbar: yes
+scripts: progress
+---
+<main id="main">
+<div class="shell">
+<section class="pagehead">
+<h1>RAG Systems: A Production Deep Dive</h1>
+<p class="lede">Being written.</p>
+<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+</section>
+</div>
+</main>

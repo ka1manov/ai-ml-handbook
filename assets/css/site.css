@@ -26,6 +26,7 @@
   --font-prose: var(--font-mono);
 
   --step--1: 13px;
+  --step-body: 15px;   /* long-form reading size */
   --step-0: 16px;
   --step-1: 19px;
   --step-2: 23px;
@@ -348,12 +349,21 @@ td code { white-space: nowrap; }
 .meta .sep { color: var(--graph); padding-inline: var(--sp-2); }
 
 .log { font-size: var(--step--1); line-height: 1.85; }
-.log__row { display: flex; gap: var(--sp-3); align-items: baseline; }
-.log__t { color: var(--text-dim); flex: none; }
-.log__lvl { flex: none; width: 5.5ch; color: var(--text-dim); }
+.log__row { display: block; }
+.log__t { display: none; }
+.log__lvl { color: var(--text-dim); margin-right: var(--sp-2); }
+.log__msg { display: inline; }
+
+/* The timestamp column is atmosphere, not information: it only appears
+   where there is room for it without squeezing the message. */
+@media (min-width: 620px) {
+  .log__row { display: flex; gap: var(--sp-3); align-items: baseline; }
+  .log__t { display: block; color: var(--text-dim); flex: none; }
+  .log__lvl { flex: none; width: 5.5ch; margin-right: 0; }
+  .log__msg { display: block; min-width: 0; }
+}
 .log__lvl--ok { color: var(--ok); }
 .log__lvl--warn { color: var(--warn); }
-.log__msg { min-width: 0; }
 
 /* --------------------------------------------------------------------------
    8. Topbar + footer
@@ -369,10 +379,12 @@ td code { white-space: nowrap; }
 .topbar__inner {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
+  flex-wrap: wrap;
+  gap: var(--sp-3);
   min-height: 52px;
   padding-block: var(--sp-2);
 }
+@media (min-width: 620px) { .topbar__inner { gap: var(--sp-4); } }
 .topbar__brand {
   font-weight: 600;
   font-size: var(--step--1);
@@ -381,10 +393,18 @@ td code { white-space: nowrap; }
   white-space: nowrap;
 }
 .topbar__brand:hover { background: none; color: var(--accent); }
-.topbar__by {
-  font-size: var(--micro);
-  color: var(--text-dim);
-  white-space: nowrap;
+/* The byline is repeated in the page header and footer, so the topbar
+   can drop it rather than overflow on a phone. */
+.topbar__by { display: none; }
+.topbar__brand-long { display: none; }
+@media (min-width: 560px) { .topbar__brand-long { display: inline; } }
+@media (min-width: 720px) {
+  .topbar__by {
+    display: inline;
+    font-size: var(--micro);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
 }
 .topbar__links {
   display: none;
@@ -447,6 +467,8 @@ td code { white-space: nowrap; }
   padding: var(--sp-5);
   margin-top: var(--sp-8);
   max-width: var(--measure);
+  font-size: var(--step-body);
+  line-height: 1.75;
 }
 .follow p { margin: 0; }
 .follow p + p { margin-top: var(--sp-3); }
@@ -476,7 +498,8 @@ td code { white-space: nowrap; }
   border: 1px solid var(--border);
   border-left-width: 2px;
   background: var(--bg-raised);
-  font-size: var(--step--1);
+  max-width: var(--measure);
+  font-size: var(--step-body);
   line-height: 1.75;
 }
 .callout > * + * { margin-top: var(--sp-3); }
@@ -497,26 +520,24 @@ td code { white-space: nowrap; }
    11. Roadmap — stages, tqdm bars, nodes
    -------------------------------------------------------------------------- */
 .stage { margin-top: var(--sp-8); scroll-margin-top: 88px; }
+/* Block layout, not flex: a flex item's max-width clamps its hypothetical
+   main size, so `flex-basis:100%` would stop forcing its own line. */
 .stage__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-3);
-  padding-bottom: var(--sp-3);
+  padding-bottom: var(--sp-4);
   border-bottom: 1px solid var(--border-strong);
 }
 .stage__num {
   font-size: var(--step-1);
   color: var(--accent);
   font-weight: 600;
-  flex: none;
+  margin-right: var(--sp-3);
 }
-.stage__title { font-size: var(--step-2); }
+.stage__title { display: inline; font-size: var(--step-2); }
 .stage__sub {
-  flex-basis: 100%;
+  max-width: 76ch;
   font-size: var(--step--1);
   color: var(--text-dim);
-  margin-top: var(--sp-1);
+  margin-top: var(--sp-3);
 }
 
 /* tqdm-style bar. Filled cells are amber, empty cells are hairline grey. */
@@ -549,7 +570,12 @@ td code { white-space: nowrap; }
 .node__body h3 { font-size: var(--step-0); }
 .node__body h3 label { cursor: pointer; }
 .node__check:checked ~ .node__body h3 label { color: var(--text-dim); text-decoration: line-through; }
-.node__body p { margin-top: var(--sp-2); font-size: var(--step--1); line-height: 1.75; }
+.node__body p {
+  margin-top: var(--sp-3);
+  max-width: 66ch;
+  font-size: var(--step-body);
+  line-height: 1.75;
+}
 .node__why b, .node__prove b { color: var(--accent); font-weight: 600; }
 .node__prove { border-left: 1px solid var(--border); padding-left: var(--sp-4); }
 .node__time { color: var(--text-dim); font-size: var(--micro); }
@@ -628,9 +654,9 @@ td code { white-space: nowrap; }
   margin-top: var(--sp-4);
   padding-left: var(--sp-4);
   border-left: 1px solid var(--border);
-  font-size: var(--step--1);
+  font-size: var(--step-body);
   line-height: 1.8;
-  max-width: var(--measure);
+  max-width: 68ch;
 }
 .qa__a > * + * { margin-top: var(--sp-3); }
 .qa__weak b { color: var(--warn); }
@@ -717,7 +743,7 @@ td code { white-space: nowrap; }
 .card h3 { font-size: var(--step-0); }
 .card h3 a { text-decoration: none; }
 .card h3 a:hover { text-decoration: underline; background: none; }
-.card p { margin-top: var(--sp-3); font-size: var(--step--1); color: var(--text-dim); line-height: 1.7; }
+.card p { margin-top: var(--sp-3); font-size: var(--step-body); color: var(--text-dim); line-height: 1.7; }
 .card .meta { margin-top: var(--sp-4); display: block; }
 
 /* --------------------------------------------------------------------------
@@ -731,7 +757,7 @@ td code { white-space: nowrap; }
   max-width: var(--measure);
 }
 .tip__n { flex: none; color: var(--text-dim); font-size: var(--step--1); width: 3ch; }
-.tip__body { min-width: 0; font-size: var(--step--1); line-height: 1.8; }
+.tip__body { min-width: 0; max-width: 66ch; font-size: var(--step-body); line-height: 1.8; }
 .tip__body b { display: block; color: var(--text); font-size: var(--step-0); margin-bottom: var(--sp-2); }
 
 /* --------------------------------------------------------------------------

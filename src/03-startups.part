@@ -1,0 +1,17 @@
+path: startups.html
+title: How Startups Should Actually Use AI
+desc: Build, buy or fine-tune. Unit economics with the arithmetic shown. Eval-first development, real moats, team composition, and a 90-day plan.
+og: og-startups.png
+ogtype: article
+readbar: yes
+scripts: progress
+---
+<main id="main">
+<div class="shell">
+<section class="pagehead">
+<h1>How Startups Should Actually Use AI</h1>
+<p class="lede">Being written.</p>
+<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+</section>
+</div>
+</main>

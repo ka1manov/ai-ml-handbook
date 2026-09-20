@@ -5,7 +5,7 @@ import { join, relative, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SKIP = new Set(['docs', 'tools', '.git', 'node_modules', '.idea', '.venv']);
+const SKIP = new Set(['docs', 'tools', '.git', 'node_modules', '.idea', '.venv', 'src']);
 const BASE = 'https://ka1manov.github.io/ai-ml-handbook/';
 const failures = [];
 const fail = (file, msg) => failures.push(`${file}: ${msg}`);
@@ -61,8 +61,10 @@ function check(file) {
   for (const m of html.matchAll(/<script[^>]+src="([^"]+)"/g)) {
     if (/^https?:/.test(m[1])) fail(rel, `external script not allowed: ${m[1]}`);
   }
-  for (const m of html.matchAll(/<link[^>]+href="([^"]+)"[^>]*>/g)) {
-    const href = m[1];
+  for (const m of html.matchAll(/<link\b([^>]*)>/g)) {
+    const tag = m[1];
+    if (!/rel="stylesheet"/.test(tag)) continue;
+    const href = (tag.match(/href="([^"]+)"/) || [])[1] || '';
     if (/^https?:/.test(href) && !/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(href)) {
       fail(rel, `external stylesheet not allowed: ${href}`);
     }
@@ -70,8 +72,12 @@ function check(file) {
 
   // --- accessibility ---------------------------------------------------
   for (const m of html.matchAll(/<img\b(?![^>]*\balt=)[^>]*>/g)) fail(rel, `img without alt: ${m[0].slice(0, 60)}`);
-  for (const m of html.matchAll(/<a\b[^>]*target="_blank"(?![^>]*rel=)[^>]*>/g)) {
-    fail(rel, `target=_blank without rel: ${m[0].slice(0, 60)}`);
+  for (const m of html.matchAll(/<a\b([^>]*)>/g)) {
+    const tag = m[1];
+    if (!/target="_blank"/.test(tag)) continue;
+    if (!/rel="[^"]*noopener[^"]*"/.test(tag)) {
+      fail(rel, `target=_blank without rel=noopener: ${m[0].slice(0, 70)}`);
+    }
   }
   for (const m of html.matchAll(/<svg\b([^>]*)>/g)) {
     const attrs = m[1];

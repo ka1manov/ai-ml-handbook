@@ -11,6 +11,9 @@
   const drawBar = (el, done, total) => {
     const ratio = total ? done / total : 0;
     const filled = Math.round(ratio * CELLS);
+    // The block characters are decorative; screen readers get the label instead.
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', done + ' of ' + total + ' complete in this stage');
     el.innerHTML =
       '<span class="bar__fill">' + '█'.repeat(filled) + '</span>' +
       '░'.repeat(CELLS - filled) +
