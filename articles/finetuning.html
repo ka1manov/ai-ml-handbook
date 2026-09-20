@@ -4,17 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Fine-Tuning: A Decision Guide</title>
-<meta name="description" content="When to fine-tune and, more often, when not to. SFT, LoRA and QLoRA mechanics, DPO versus RLHF, dataset quality over quantity, and evaluating a fine-tune honestly.">
+<meta name="description" content="When to fine-tune and, more often, when not to. SFT, LoRA and QLoRA mechanics, DPO versus RLHF, dataset quality over quantity, catastrophic forgetting, and evaluating a fine-tune honestly.">
 <link rel="canonical" href="https://ka1manov.github.io/ai-ml-handbook/articles/finetuning.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="The AI/ML Engineering Handbook">
-<meta property="og:title" content="Fine-Tuning: A Decision Guide">
-<meta property="og:description" content="When to fine-tune and, more often, when not to. SFT, LoRA and QLoRA mechanics, DPO versus RLHF, dataset quality over quantity, and evaluating a fine-tune honestly.">
+<meta property="og:title" content="Fine-Tuning — A Decision Guide">
+<meta property="og:description" content="When to fine-tune and, more often, when not to. SFT, LoRA and QLoRA mechanics, DPO versus RLHF, dataset quality over quantity, catastrophic forgetting, and evaluating a fine-tune honestly.">
 <meta property="og:url" content="https://ka1manov.github.io/ai-ml-handbook/articles/finetuning.html">
 <meta property="og:image" content="https://ka1manov.github.io/ai-ml-handbook/assets/img/og-articles.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Fine-Tuning: A Decision Guide — the AI/ML Engineering Handbook by @ka1manov">
+<meta property="og:image:alt" content="Fine-Tuning — A Decision Guide — the AI/ML Engineering Handbook by @ka1manov">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@ka1manov">
 <meta name="twitter:creator" content="@ka1manov">
@@ -63,11 +63,252 @@
 </header>
 <main id="main">
 <div class="shell">
-<section class="pagehead">
-<h1>Fine-Tuning: A Decision Guide</h1>
-<p class="lede">Being written.</p>
-<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">cat ~/articles/finetuning.md</p>
+  <h1>Fine-tuning: mostly, a guide to not doing it</h1>
+  <p class="lede">Fine-tuning is the most over-reached-for tool in applied LLM work. It is genuinely excellent at one thing and quietly terrible at another, and teams reach for it to solve the second. This is the decision framework, the mechanics when the answer is yes, and the evaluation that tells you whether it worked.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~3.1k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~15m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
 </section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#question">The question to ask first</a></li>
+      <li><a href="#ladder">What to try before this</a></li>
+      <li><a href="#sft">Supervised fine-tuning</a></li>
+      <li><a href="#lora">LoRA and QLoRA</a></li>
+      <li><a href="#prefs">Preference tuning: DPO and RLHF</a></li>
+      <li><a href="#data">The dataset is the project</a></li>
+      <li><a href="#forgetting">Catastrophic forgetting</a></li>
+      <li><a href="#eval">Evaluating a fine-tune honestly</a></li>
+      <li><a href="#costs">The costs nobody budgets</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="question">
+  <div class="prose">
+    <h2>The question to ask first</h2>
+
+    <p>Look at your actual failures — fifty of them, read individually — and sort them into two piles.</p>
+
+    <p><b>Pile one: the model does not know something.</b> It gets your product names wrong, does not know your policies, invents details about your domain, cites things that do not exist. This is a <b>knowledge</b> problem.</p>
+
+    <p><b>Pile two: the model knows the content but produces it wrong.</b> Wrong format, wrong length, wrong register, ignores a structural convention, will not consistently follow a schema, writes like a chatbot when it should write like a case note. This is a <b>behaviour</b> problem.</p>
+
+    <div class="callout callout--kill">
+      <span class="callout__label">the single most important sentence on this page</span>
+      <p><b>Fine-tuning teaches form. Retrieval supplies facts.</b></p>
+      <p>Fine-tuning on documents to install knowledge produces a model that has absorbed the <i>style</i> of those documents and will now confidently invent new facts in exactly that style. You have made hallucination more fluent and harder to spot. This is the most expensive misdiagnosis in applied LLM work, and it is extremely common — the demo looks better, which is precisely why it survives to production.</p>
+    </div>
+
+    <p>If pile one dominates, you want <a href="../rag.html">retrieval</a>. If pile two dominates, fine-tuning is a real candidate. If both, do retrieval first, then re-read the errors — the remaining pile is usually much smaller than you expected.</p>
+  </div>
+</section>
+
+<section class="section" id="ladder">
+  <div class="prose">
+    <h2>What to try before this</h2>
+
+    <p>Each step costs roughly an order of magnitude less than the next. Work up, not down.</p>
+
+    <p><b>1. A better prompt.</b> Explicit structure, the task stated as a role rather than a request, the output format specified exactly, and the edge cases named. An afternoon. It resolves more cases than people expect, largely because most first prompts are underspecified rather than wrong.</p>
+
+    <p><b>2. Few-shot examples.</b> Three to five examples in the prompt teach format extremely effectively — often as well as a fine-tune for formatting alone. Select examples that cover the variation you care about, including the awkward cases. If your examples are all easy, you have taught the model that the task is easy.</p>
+
+    <p><b>3. Constrained decoding.</b> If the requirement is structural — valid JSON, a fixed schema, a restricted vocabulary — enforce it during generation. A grammar constraint never samples an invalid token, which is categorically stronger than any amount of training and instruction. Fine-tuning to improve schema adherence when constrained decoding would guarantee it is a common waste.</p>
+
+    <p><b>4. Decomposition.</b> Split one hard call into two easy ones. A model that cannot reliably extract and classify in a single pass often does both perfectly in sequence.</p>
+
+    <p><b>5. A better model.</b> Trivial to test, and frequently cheaper in total than a fine-tune of a smaller one once you count engineering time.</p>
+
+    <p><b>6. Now consider fine-tuning.</b></p>
+
+    <p>The reason for the order is not purity. It is that each of these is reversible in minutes and a fine-tune is an artefact you now own, must evaluate, must re-do when the base model is deprecated, and must keep a pipeline alive for.</p>
+  </div>
+</section>
+
+<section class="section" id="sft">
+  <div class="prose">
+    <h2>Supervised fine-tuning</h2>
+
+    <p>The mechanics are ordinary: continue training the model on your examples of input and desired output, with the standard next-token objective, at a much lower learning rate than pretraining used.</p>
+
+    <p>The detail that matters and is easy to get wrong is <b>loss masking</b>. You want the loss computed only on the response tokens, not on the prompt tokens. Training the model to predict the user's input is not the task and it dilutes the gradient toward whatever your prompts happen to look like.</p>
+
+<pre><code><span class="c-com"># Mask the prompt: only the response contributes to the loss.</span>
+labels = input_ids.clone()
+labels[:, :prompt_len] = -<span class="c-num">100</span>   <span class="c-com"># the ignore index</span>
+
+<span class="c-com"># Also: match the base model's chat template EXACTLY.
+# Different special tokens or spacing between training and serving
+# is a real and silent failure — the model behaves as if it were
+# given an input it never saw in training, because it was.</span>
+</code></pre>
+
+    <p>That second comment causes more confusing fine-tune failures than anything else on this page. The template is part of the interface, and a mismatch degrades quality in a way that looks like the fine-tune simply did not work.</p>
+
+    <p>Hyperparameters that actually matter: a learning rate one to two orders of magnitude below pretraining; very few epochs, since one to three is typical and more usually means memorisation; and a warmup, because a cold start at even a small learning rate can damage a pretrained model quickly.</p>
+  </div>
+</section>
+
+<section class="section" id="lora">
+  <div class="prose">
+    <h2>LoRA and QLoRA</h2>
+
+    <p>Full fine-tuning updates every parameter, which requires memory for the weights, their gradients, and the optimiser state — for Adam, roughly four times the model size beyond the weights themselves. For a large model that is more memory than most people have.</p>
+
+    <p>LoRA starts from an observation: the <i>change</i> a fine-tune makes to a weight matrix has much lower intrinsic rank than the matrix itself. So rather than learning the full update, learn a low-rank factorisation of it.</p>
+
+<pre><code><span class="c-com"># W is frozen. Only A and B train.</span>
+<span class="c-com"># W: [d, k]   A: [d, r]   B: [r, k]   with r << min(d, k)</span>
+
+h = x @ W + (x @ A @ B) * (alpha / r)
+
+<span class="c-com"># For d = k = 4096 and r = 16:
+#   full update  = 16.8M parameters
+#   LoRA update  =  0.13M parameters   (~0.8%)
+# B is initialised to zero, so the adapter starts as a no-op
+# and the model begins exactly as the base model.</span>
+</code></pre>
+
+    <p>Three consequences follow, and the third is the one that changes architecture decisions.</p>
+
+    <p>Memory drops enormously, because optimiser state is only needed for the adapter. Training is faster. And <b>the adapter is tiny and separable</b> — a few megabytes — so you can keep many task-specific adapters over one base model and swap them per request, rather than hosting many full models. For a multi-tenant product that is the difference between feasible and not.</p>
+
+    <p><b>QLoRA</b> goes further: quantise the frozen base model to 4-bit while training the adapter in higher precision. The base is never updated, so quantisation error does not accumulate through training, and the memory saving is large enough to fine-tune substantial models on a single consumer GPU.</p>
+
+    <p>Practical notes: <code>r</code> between 8 and 64 covers most cases, and larger is not reliably better — it mostly increases the capacity to overfit. Apply adapters to the attention projections at minimum; including the feed-forward layers helps on harder adaptations at proportional cost. And <code>alpha</code> is a scaling factor conventionally set to twice <code>r</code>, which matters more than its obscurity suggests.</p>
+
+    <p>Full fine-tuning still wins when you are teaching a genuinely large behavioural shift, or adapting to a domain far from the pretraining distribution. For the format-and-style adaptations most products need, LoRA is usually indistinguishable in quality and vastly cheaper.</p>
+  </div>
+</section>
+
+<section class="section" id="prefs">
+  <div class="prose">
+    <h2>Preference tuning: DPO and RLHF</h2>
+
+    <p>Supervised fine-tuning teaches the model to imitate good outputs. It has no way to express that one output is <i>better</i> than another, which is exactly the signal you have when a human compares two responses.</p>
+
+    <p><b>RLHF</b> handles this in two stages. Train a reward model to predict which of two responses a human preferred, then optimise the policy against that reward with reinforcement learning, with a KL penalty holding it close to the reference model so it does not collapse into whatever degenerate output the reward model overrates.</p>
+
+    <p>It works and it is operationally demanding: four models in memory, sensitive hyperparameters, and genuine instability.</p>
+
+    <p><b>DPO</b> observes that for this specific objective there is a closed-form relationship between the optimal policy and the implied reward, which lets you rewrite the whole thing as a classification loss directly on preference pairs.</p>
+
+<pre><code><span class="c-com"># DPO: no reward model, no RL loop, no sampling during training.
+# Raise the likelihood of the chosen response relative to the
+# rejected one, measured against a frozen reference model.</span>
+
+loss = -log_sigmoid(
+    beta * ((logp_chosen  - ref_logp_chosen)
+          - (logp_rejected - ref_logp_rejected))
+)
+</code></pre>
+
+    <p>That is why it was adopted so quickly: it drops into an existing supervised pipeline. You need a reference model and preference pairs, and nothing else changes.</p>
+
+    <p>What you give up is real, though usually acceptable. A reward model can score arbitrary new outputs and be reused across projects. Online RL can explore beyond the preference dataset, while DPO is bounded by the pairs you collected. And DPO is sensitive to <code>beta</code> and can overfit to the preference data, drifting further from the reference than intended.</p>
+
+    <p>The practical sequence is almost always: SFT first to establish the behaviour, then preference tuning to refine it. Preference tuning on a base model that has not been taught the task is trying to refine something that does not exist yet.</p>
+  </div>
+</section>
+
+<section class="section" id="data">
+  <div class="prose">
+    <h2>The dataset is the project</h2>
+
+    <p>The modelling is a few days. The data is the rest, and it determines the outcome almost entirely.</p>
+
+    <p><b>Quality dominates quantity, and the effect is not subtle.</b> A carefully curated set of a thousand examples routinely beats fifty thousand scraped ones. This is genuinely counterintuitive to people arriving from classical ML, where more data is nearly always better. The difference is that a pretrained model already has the capability; you are selecting for a behaviour, not teaching a function from scratch, and every bad example teaches a bad behaviour with full force.</p>
+
+    <p><b>Consistency matters more than volume.</b> If your examples disagree with each other — two of them format dates differently, three refuse a request the others answer — you are teaching the model to be inconsistent, and it will learn that faithfully. Write the annotation guideline first, then label, then audit a sample against the guideline.</p>
+
+    <p><b>Cover the distribution, including the awkward parts.</b> A dataset of only clean, easy cases produces a model that handles clean, easy cases. Deliberately include the ambiguous inputs, the ones where the right answer is to ask a clarifying question, and the ones that should be refused.</p>
+
+    <p><b>Hold out a real test set before you start,</b> split by whatever grouping matters — document, customer, time period — so that near-duplicates cannot straddle the boundary. And keep it untouched, because the temptation to look at it while iterating is strong and it destroys the only unbiased number you have.</p>
+
+    <p><b>On synthetic data:</b> useful for augmentation and coverage of rare cases, dangerous as the bulk of a dataset. Generating training data with a model and training on it concentrates that model's biases and failure modes, and the resulting evaluation looks fine because your eval set is probably synthetic too. Use it to fill gaps you have identified, with human review, not to avoid the labelling work.</p>
+  </div>
+</section>
+
+<section class="section" id="forgetting">
+  <div class="prose">
+    <h2>Catastrophic forgetting</h2>
+
+    <p>Training on a narrow distribution degrades capabilities outside it. Fine-tune hard on legal document summarisation and the model gets worse at general conversation, at following unrelated instructions, and sometimes at basic reasoning.</p>
+
+    <p>It is not a bug; it is what optimisation does when you point it at a narrow objective. The model has finite capacity allocated by the gradient, and your gradient only cares about your task.</p>
+
+    <p>Mitigations, in order of practicality:</p>
+
+    <p><b>Train less.</b> Fewer epochs, lower learning rate. Most forgetting comes from overtraining on a small set, and the cure is frequently just stopping earlier.</p>
+
+    <p><b>Use LoRA.</b> Constraining the update to a low-rank adapter limits how far the model can move, which limits what it can lose. This is an underrated reason to prefer LoRA beyond the memory savings.</p>
+
+    <p><b>Mix in general data.</b> Include a fraction of general instruction-following examples alongside your task data, so the gradient has a reason to preserve the general capability.</p>
+
+    <p><b>Measure it.</b> This is the important one. Keep a small general-capability evaluation alongside your task evaluation and run both. Without it, forgetting is invisible during development and shows up as user complaints about behaviour you never tested — because you were only ever testing the thing you optimised.</p>
+  </div>
+</section>
+
+<section class="section" id="eval">
+  <div class="prose">
+    <h2>Evaluating a fine-tune honestly</h2>
+
+    <p>The comparison that means something is against the strongest alternative you could have shipped instead, not against a weak baseline.</p>
+
+    <p><b>Compare against a well-engineered prompt on the base model.</b> Not a lazy prompt. If your fine-tune beats a bad prompt, you have learned nothing, and this is the most common way fine-tune results are inflated — usually unintentionally, because the prompt baseline was written in an hour and the fine-tune took three weeks.</p>
+
+    <p><b>Compare against few-shot prompting</b> with examples drawn from the same training set. This is frequently the real competitor and it frequently wins on formatting tasks.</p>
+
+    <p><b>Compare against a larger base model</b> without fine-tuning. Sometimes a bigger model with a good prompt beats your fine-tuned smaller one, at comparable cost and with none of the maintenance burden.</p>
+
+    <p>Then measure the things the task metric will not show you:</p>
+
+    <p><b>General capability</b>, to catch forgetting. <b>Refusal behaviour</b>, because fine-tuning on task data frequently erodes safety training and this is a real risk rather than a theoretical one. <b>Robustness to input variation</b>, since a model trained on uniformly formatted inputs may be brittle to real ones. <b>Calibration</b>, if anything downstream uses confidence. And <b>serving cost</b>, including whether you can still batch efficiently with per-tenant adapters.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the decision memo</span>
+      <p>Before training anything, write half a page: what you tried first and why it was insufficient, what the fine-tune will cost to train and to serve, what data you need and who will label it, what evaluation would convince you it worked, and what happens when the base model is deprecated.</p>
+      <p>Most such memos end with "do not fine-tune," and that is a successful outcome — it is a week of work avoided, not a failure to be clever.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="costs">
+  <div class="prose">
+    <h2>The costs nobody budgets</h2>
+
+    <p>The training run is the cheap part and the only part that appears in most estimates.</p>
+
+    <p><b>Data labelling.</b> Usually the dominant cost, usually underestimated by a large factor, and it recurs every time the task definition shifts.</p>
+
+    <p><b>The evaluation set.</b> You need one regardless, but a fine-tune makes it mandatory and makes it need to be broader — task performance plus general capability plus safety.</p>
+
+    <p><b>Serving.</b> A custom model may not fit the batching and caching your hosted endpoint gave you for free. Per-tenant adapters complicate batching further. This shows up as a bill, not as a project.</p>
+
+    <p><b>Base model deprecation.</b> The model you fine-tuned will be superseded. When it is, you redo the fine-tune, re-evaluate, and re-deploy — and if your data pipeline was a notebook, you rebuild that too. Plan for it as a recurring obligation rather than a surprise.</p>
+
+    <p><b>Being one version behind, permanently.</b> This is the strategic cost and it is the one that actually matters. Base models improve quickly, and each improvement is available to a prompting-based competitor immediately and to you after a re-training cycle. Over a couple of years that gap compounds.</p>
+
+    <p>None of which means do not fine-tune. It means fine-tune when the behaviour genuinely cannot be obtained otherwise, with a decision you can defend and an evaluation that would have told you not to.</p>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> for more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="evaluation.html">evaluation engineering</a></span><span class="sep">|</span><span class="v"><a href="../rag.html">RAG, properly</a></span><span class="sep">|</span><span class="v"><a href="../startups.html">build, buy or fine-tune</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
 </div>
 </main>
 
@@ -113,6 +354,6 @@
 <script src="../assets/js/theme.js" defer></script>
 <script src="../assets/js/nav.js" defer></script>
 <script src="../assets/js/search.js" defer></script>
-<script src="../assets/js/progress.js" defer></script>
+<script src="../assets/js/rail.js" defer></script>
 </body>
 </html>

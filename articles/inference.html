@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LLM Inference Economics and Serving</title>
-<meta name="description" content="Prefill versus decode, KV cache arithmetic, continuous batching, quantisation and speculative decoding — where the money actually goes when you serve a language model.">
+<meta name="description" content="Prefill versus decode, KV cache arithmetic, continuous batching, quantisation and speculative decoding — where the money actually goes when you serve a language model, and which lever moves which number.">
 <link rel="canonical" href="https://ka1manov.github.io/ai-ml-handbook/articles/inference.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="The AI/ML Engineering Handbook">
 <meta property="og:title" content="LLM Inference Economics and Serving">
-<meta property="og:description" content="Prefill versus decode, KV cache arithmetic, continuous batching, quantisation and speculative decoding — where the money actually goes when you serve a language model.">
+<meta property="og:description" content="Prefill versus decode, KV cache arithmetic, continuous batching, quantisation and speculative decoding — where the money actually goes when you serve a language model, and which lever moves which number.">
 <meta property="og:url" content="https://ka1manov.github.io/ai-ml-handbook/articles/inference.html">
 <meta property="og:image" content="https://ka1manov.github.io/ai-ml-handbook/assets/img/og-articles.png">
 <meta property="og:image:width" content="1200">
@@ -63,11 +63,276 @@
 </header>
 <main id="main">
 <div class="shell">
-<section class="pagehead">
-<h1>LLM Inference Economics and Serving</h1>
-<p class="lede">Being written.</p>
-<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv</p>
+  <h1>Where the money goes when you serve a language model</h1>
+  <p class="lede">Training is a project. Inference is a bill that arrives every month for the life of the product, and it is usually the larger number. This is how serving actually works, which costs are which, and which optimisation moves which metric — because several of them trade directly against each other.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~3.4k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~16m</span><span class="sep">|</span><span class="k">level</span> <span class="v">senior</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
 </section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#two-phases">Two phases, two bottlenecks</a></li>
+      <li><a href="#memory">The memory budget</a></li>
+      <li><a href="#batching">Batching, and why continuous</a></li>
+      <li><a href="#quant">Quantisation</a></li>
+      <li><a href="#spec">Speculative decoding</a></li>
+      <li><a href="#metrics">The metrics that matter</a></li>
+      <li><a href="#levers">Which lever moves which number</a></li>
+      <li><a href="#hosted">Self-host or buy</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="two-phases">
+  <div class="prose">
+    <h2>Two phases, two bottlenecks</h2>
+
+    <p>Almost every serving mistake comes from treating inference as one thing. It is two, and they have opposite characteristics.</p>
+
+    <p><b>Prefill</b> processes the entire prompt in a single forward pass. Every token is available at once, so the work is large dense matrix multiplications — exactly what accelerators are built for. Prefill is <b>compute-bound</b>: the arithmetic units are the limit.</p>
+
+    <p><b>Decode</b> generates one token at a time. Each step multiplies a single vector against the model's weights, which means reading every parameter from memory to do a trivially small amount of arithmetic. Decode is <b>memory-bandwidth-bound</b>: moving the weights is the limit, and the arithmetic units sit largely idle.</p>
+
+    <p>That asymmetry explains nearly everything about serving.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the consequence that matters most</span>
+      <p>Because decode is bandwidth-bound, generating a token for one request costs almost exactly the same weight read as generating tokens for thirty-two requests simultaneously. The weights are read once either way.</p>
+      <p>This is why batching produces such enormous throughput gains during decode, and why an unbatched endpoint is leaving most of the hardware's value unused. It is also why speculative decoding works: verifying several candidate tokens costs barely more than verifying one.</p>
+    </div>
+
+    <p>A second consequence: prefill and decode compete. A long prompt arriving mid-generation occupies the compute units and stalls decode for everyone in the batch — visible to users as a stutter in streaming output. Serving stacks handle this by chunking prefill into pieces that interleave with decode steps, trading a little prefill latency for much smoother generation across the batch.</p>
+  </div>
+</section>
+
+<section class="section" id="memory">
+  <div class="prose">
+    <h2>The memory budget</h2>
+
+    <p>Memory, not compute, is usually what decides how many users you can serve. Three things compete for it.</p>
+
+<pre><code>total = weights + kv_cache + activations
+
+weights   = n_params * bytes_per_param
+          <span class="c-com"># fp16: 2 bytes. int8: 1. int4: ~0.5.</span>
+
+kv_cache  = 2 * n_layers * n_kv_heads * d_head
+          * seq_len * batch_size * bytes_per_element
+          <span class="c-com"># linear in BOTH context length and batch size</span>
+
+activations <span class="c-com"># modest with memory-efficient attention; was not always</span>
+</code></pre>
+
+    <p>Weights are fixed once you pick the model and precision. Activations are small with modern attention implementations. So the KV cache is the term that varies, and it is the one that decides your concurrency.</p>
+
+    <p>Rearranged, that gives the number you actually want:</p>
+
+<pre><code>max_batch = (memory - weights) / kv_bytes_per_sequence
+
+<span class="c-com"># And therefore, directly:
+#   longer context  -> fewer concurrent users
+#   fewer concurrent users -> lower throughput
+#   lower throughput -> higher cost per request
+# Context length is a cost decision, not only a capability one.</span>
+</code></pre>
+
+    <p>Work this out for your model and hardware before deployment. Discovering it under load is how you find out that your advertised 128k context window supports four concurrent users.</p>
+
+    <h3>Reducing the cache</h3>
+
+    <p><b>Grouped-query attention</b> shares one key/value head across a group of query heads. Eight KV heads instead of sixty-four cuts the cache eightfold at a modest quality cost. This is an architectural choice made at training time, so it is a reason to prefer certain models rather than something you can retrofit.</p>
+
+    <p><b>Paged attention</b> allocates the cache in fixed-size blocks instead of one contiguous buffer per sequence. Without it you must reserve worst-case length for every request, and a request that generates 50 tokens holds memory for 4,000. Paging typically recovers a large fraction of that waste and is the main reason modern serving engines achieve the batch sizes they do.</p>
+
+    <p><b>Prefix caching</b> keeps the KV entries for a shared prompt prefix across requests. If every request begins with the same 2,000-token system prompt, you can compute it once. On chat products with a long fixed preamble this eliminates a substantial share of prefill work outright.</p>
+  </div>
+</section>
+
+<section class="section" id="batching">
+  <div class="prose">
+    <h2>Batching, and why continuous</h2>
+
+    <p>Static batching — collect n requests, run them together, return them together — is the obvious approach and it wastes most of its potential.</p>
+
+    <p>The problem is that generation lengths vary enormously. Batch eight requests where seven finish in 40 tokens and one runs to 900, and for 860 steps you are running a batch of eight to produce one useful token. The finished slots are occupied by padding.</p>
+
+    <p><b>Continuous batching</b> — also called in-flight batching — operates at the granularity of a step rather than a request. When a sequence finishes it leaves the batch immediately and a queued request takes its slot on the very next step. The batch stays full.</p>
+
+<pre><code><span class="c-com"># static: the batch is hostage to its slowest member</span>
+step   1: [A B C D E F G H]
+step  40: [A _ _ _ _ _ _ H]   <span class="c-com"># six slots wasted</span>
+step 900: [_ _ _ _ _ _ _ H]   <span class="c-com"># seven slots wasted for 860 steps</span>
+
+<span class="c-com"># continuous: finished sequences leave, queued ones join</span>
+step   1: [A B C D E F G H]
+step  40: [A I J K L M N H]   <span class="c-com"># refilled on the next step</span>
+step 900: [P Q R S T U V H]   <span class="c-com"># still full</span>
+</code></pre>
+
+    <p>On workloads with variable output lengths — which is nearly all real workloads — this is typically the single largest throughput improvement available, and it requires no change to the model. If you are serving without it, it is the first thing to fix.</p>
+
+    <p>The trade is that a request's latency now depends on what else is in the batch. Larger batches raise throughput and raise per-request latency, which is why interactive and bulk traffic generally belong in separate pools with different batch-size targets rather than competing in one.</p>
+  </div>
+</section>
+
+<section class="section" id="quant">
+  <div class="prose">
+    <h2>Quantisation</h2>
+
+    <p>Store weights in fewer bits. Because decode is bandwidth-bound, halving the bytes per parameter roughly halves the time spent reading weights — so quantisation buys speed as well as memory, which is the part people underestimate.</p>
+  </div>
+
+  <div class="scroll-x" style="margin-top:var(--sp-5)">
+    <table>
+      <caption>Quantisation levels. Quality impact is task-dependent and must be measured on your own evaluation set — the general claim that "int8 is basically lossless" is true on average and not true for every task.</caption>
+      <thead>
+        <tr><th>Precision</th><th>Memory vs fp16</th><th>Typical use</th><th>Watch for</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>fp16 / bf16</b></td><td>baseline</td><td>The default. bf16 is preferred where supported for its wider exponent range.</td><td>Nothing; this is the reference.</td></tr>
+        <tr><td><b>int8</b></td><td>~50%</td><td>Widely used in production. Usually a small quality cost.</td><td>Outlier activations in some layers; per-channel scaling handles most of it.</td></tr>
+        <tr><td><b>int4</b></td><td>~25%</td><td>Fitting a larger model onto smaller hardware — often a better trade than a smaller model at fp16.</td><td>Measurable degradation, concentrated in harder tasks: reasoning, code, long context.</td></tr>
+        <tr><td><b>Below int4</b></td><td>&lt;25%</td><td>Research and extreme constraints.</td><td>Substantial quality loss. Verify against your own tasks before believing any published claim.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Two distinctions worth having clear.</p>
+
+    <p><b>Weight-only versus weight-and-activation.</b> Weight-only quantisation stores compressed weights and dequantises them to compute in higher precision. It gets the memory and bandwidth savings with minimal quality impact, and it is the common choice. Quantising activations too allows genuinely lower-precision arithmetic and is more aggressive in both senses.</p>
+
+    <p><b>Post-training versus quantisation-aware.</b> Post-training quantisation converts a finished model using a small calibration set — cheap, fast, usually sufficient. Quantisation-aware training simulates the quantisation during training so the model adapts to it, which recovers more quality at low bit-widths and costs a training run.</p>
+
+    <div class="callout callout--warn">
+      <span class="callout__label">measure the trade, do not assume it</span>
+      <p>Aggregate benchmark scores often barely move under quantisation while specific capabilities degrade noticeably. Long-context retrieval, multi-step arithmetic, structured output adherence and code generation are the usual casualties, and an average score hides all of them.</p>
+      <p>Run your own evaluation suite at each precision before shipping. This is one of the clearest cases where having a task-specific eval set converts a guess into a decision.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="spec">
+  <div class="prose">
+    <h2>Speculative decoding</h2>
+
+    <p>The insight follows directly from decode being bandwidth-bound. Reading the whole model to produce one token is wasteful; reading it to verify five candidate tokens costs almost the same.</p>
+
+    <p>So: a small fast draft model proposes several tokens ahead. The large model evaluates all of them in one forward pass and accepts the longest prefix consistent with what it would have generated itself, rejecting the rest.</p>
+
+<pre><code>draft  proposes:  " the quick brown fox jumps"
+target verifies:  " the quick brown"  ✓✓✓   "fox" ✗
+
+<span class="c-com"># Three tokens accepted for one target forward pass.
+# The rejected suffix is discarded and the next round begins.</span>
+</code></pre>
+
+    <p>Done with the correct acceptance rule, the output distribution is <b>identical</b> to what the target model would have produced alone. It is a pure latency optimisation with no quality trade — which is unusual enough to be worth stating plainly, because most optimisations on this page do trade something.</p>
+
+    <p>The speedup depends on the acceptance rate, which depends on how well the draft mimics the target. A draft that is too weak gets rejected constantly and adds overhead; one that is too strong costs as much as the model it is helping. Variants avoid the separate draft model entirely — predicting several tokens from the target model's own hidden states, or drafting from the prompt text for tasks with heavy copying, which works remarkably well for summarisation and editing.</p>
+
+    <p>The important caveat for capacity planning: speculative decoding improves <i>latency</i> for a single request and can <i>reduce</i> total throughput under heavy load, because the rejected tokens are wasted compute. It is a good fit for interactive traffic with spare capacity, and a poor fit for a saturated batch endpoint.</p>
+  </div>
+</section>
+
+<section class="section" id="metrics">
+  <div class="prose">
+    <h2>The metrics that matter</h2>
+
+    <p>"Latency" is not one number and conflating the parts leads to optimising the wrong thing.</p>
+
+    <p><b>Time to first token (TTFT).</b> From request to the first token appearing. Dominated by queueing plus prefill, so it scales with prompt length. This is what determines whether the product feels responsive, because it is the gap where the user sees nothing.</p>
+
+    <p><b>Inter-token latency (ITL).</b> The gap between subsequent tokens during streaming. Determines whether generation feels smooth. Beyond roughly the speed of comfortable reading, improving it further is not perceptible — which makes it a place where you can deliberately trade latency for throughput.</p>
+
+    <p><b>Total latency.</b> TTFT plus ITL times output length. Output length is frequently the dominant term, which makes "instruct the model to be concise" a genuine latency optimisation and not just a cost one.</p>
+
+    <p><b>Throughput.</b> Tokens per second across all requests, or requests per second. This is the number that determines cost per request, and it trades directly against per-request latency through batch size.</p>
+
+    <p>Track percentiles rather than means. A p50 of 200ms with a p99 of 12 seconds is a product where one request in a hundred looks broken, and the mean will not tell you.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">set the budget before choosing the architecture</span>
+      <p>Decide the acceptable TTFT and ITL first, then design to fit. Working the other way — building the pipeline and measuring afterwards — usually produces an architecture with five sequential model calls and a latency floor you cannot optimise past without rebuilding it.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="levers">
+  <div class="prose">
+    <h2>Which lever moves which number</h2>
+    <p>The table most serving discussions need and rarely have. Several of these trade against each other, and knowing which is which prevents a lot of wasted work.</p>
+  </div>
+
+  <div class="scroll-x" style="margin-top:var(--sp-5)">
+    <table>
+      <caption>Optimisations by what they actually improve. "↑" means improves, "↓" means worsens, "—" means roughly unaffected.</caption>
+      <thead>
+        <tr><th>Lever</th><th>TTFT</th><th>ITL</th><th>Throughput</th><th>Cost</th><th>Quality</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Continuous batching</b></td><td>↑</td><td>—</td><td>↑↑</td><td>↑↑</td><td>—</td><td>Usually the largest win. No quality cost. Do this first.</td></tr>
+        <tr><td><b>Larger batch</b></td><td>↓</td><td>↓</td><td>↑↑</td><td>↑↑</td><td>—</td><td>The core throughput/latency trade. Separate pools for interactive and bulk.</td></tr>
+        <tr><td><b>Quantisation</b></td><td>↑</td><td>↑</td><td>↑</td><td>↑↑</td><td>↓</td><td>Also frees memory for a bigger batch, compounding the gain.</td></tr>
+        <tr><td><b>Speculative decoding</b></td><td>—</td><td>↑↑</td><td>↓</td><td>↓</td><td>—</td><td>Latency win, throughput loss. Good with spare capacity, bad when saturated.</td></tr>
+        <tr><td><b>Prefix caching</b></td><td>↑↑</td><td>—</td><td>↑</td><td>↑↑</td><td>—</td><td>Large win wherever a long system prompt is shared. Nearly free.</td></tr>
+        <tr><td><b>Paged attention</b></td><td>—</td><td>—</td><td>↑↑</td><td>↑↑</td><td>—</td><td>Recovers memory lost to fragmentation, which becomes batch size.</td></tr>
+        <tr><td><b>Grouped-query attention</b></td><td>—</td><td>↑</td><td>↑↑</td><td>↑↑</td><td>↓</td><td>Architectural; chosen at training time, not retrofittable.</td></tr>
+        <tr><td><b>Shorter prompts</b></td><td>↑↑</td><td>↑</td><td>↑</td><td>↑↑</td><td>?</td><td>Fewer retrieved chunks costs recall only if you needed them. Measure.</td></tr>
+        <tr><td><b>Shorter outputs</b></td><td>—</td><td>—</td><td>↑</td><td>↑↑</td><td>?</td><td>Directly proportional. Often better product as well.</td></tr>
+        <tr><td><b>Smaller model</b></td><td>↑↑</td><td>↑↑</td><td>↑↑</td><td>↑↑</td><td>↓↓</td><td>The biggest lever in both directions. Route by difficulty rather than switching wholesale.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>The row worth dwelling on is the last. <b>Routing by difficulty is usually the highest-return cost optimisation available</b>, because most traffic does not need the largest model. Classify incoming requests, send the easy majority somewhere cheap, escalate the rest, and let your evaluation suite confirm quality held. It is typically a week of work for a large and permanent saving.</p>
+  </div>
+</section>
+
+<section class="section" id="hosted">
+  <div class="prose">
+    <h2>Self-host or buy</h2>
+
+    <p>The arithmetic is more one-sided than people expect, in both directions depending on scale.</p>
+
+    <p><b>A hosted API</b> charges per token with no fixed cost. You pay exactly for what you use, you get zero operational burden, and you get new models without a migration project. At low and moderate volume this is almost always cheaper than self-hosting, because a GPU costs the same whether it is busy or idle and most workloads are spiky.</p>
+
+    <p><b>Self-hosting</b> replaces a variable cost with a fixed one. That becomes favourable only at sustained high utilisation — the crossover is where your token volume, priced at API rates, exceeds the fully loaded cost of the hardware plus the engineers who keep it running. That second term is the one omitted from most comparisons, and it is not small.</p>
+
+    <p>Reasons to self-host that are not about cost, and are frequently the real reasons:</p>
+
+    <p><b>Data cannot leave your environment.</b> Regulatory or contractual. This is a genuine requirement and settles the argument on its own.</p>
+
+    <p><b>You need a model nobody hosts</b> — your own fine-tune, or an open model with modifications.</p>
+
+    <p><b>Latency floor.</b> Co-locating the model with your application removes a network hop, which matters at tight budgets.</p>
+
+    <p><b>Predictability.</b> No rate limits you do not control, no deprecation timeline set by someone else, no pricing change mid-quarter.</p>
+
+    <div class="callout callout--kill">
+      <span class="callout__label">the honest default</span>
+      <p>Start on a hosted API. Instrument cost per successful outcome from the first week. Revisit self-hosting when the monthly bill is large enough that a dedicated engineer's time is a rounding error against it — and even then, model the utilisation honestly, because a GPU at 20% duty cycle is much more expensive per token than the sticker price suggests.</p>
+      <p>Keep the model behind an interface either way, so the decision stays reversible and your evaluation suite can compare options on equal terms.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> for more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="transformers.html">transformer internals</a></span><span class="sep">|</span><span class="v"><a href="../startups.html">unit economics</a></span><span class="sep">|</span><span class="v"><a href="vector-search.html">vector search internals</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
 </div>
 </main>
 
@@ -113,6 +378,6 @@
 <script src="../assets/js/theme.js" defer></script>
 <script src="../assets/js/nav.js" defer></script>
 <script src="../assets/js/search.js" defer></script>
-<script src="../assets/js/progress.js" defer></script>
+<script src="../assets/js/rail.js" defer></script>
 </body>
 </html>

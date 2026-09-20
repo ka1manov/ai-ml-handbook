@@ -1,17 +1,338 @@
 path: articles/transformers.html
 title: Transformers, From Attention to KV Cache
-desc: How a transformer actually computes: scaled dot-product attention, multi-head projections, positional encodings from absolute to RoPE, and why context length costs what it does.
+ogtitle: Transformers — From Attention to KV Cache
+desc: How a transformer actually computes: scaled dot-product attention, multi-head projections, positional encodings from absolute to RoPE, the KV cache, and why context length costs what it does.
 og: og-articles.png
 ogtype: article
 readbar: yes
-scripts: progress
+scripts: rail
 ---
 <main id="main">
 <div class="shell">
-<section class="pagehead">
-<h1>Transformers, From Attention to KV Cache</h1>
-<p class="lede">Being written.</p>
-<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">cat ~/articles/transformers.md</p>
+  <h1>Transformers, from attention to KV cache</h1>
+  <p class="lede">The architecture is genuinely simple — simpler than the CNNs it displaced. What is not simple is the engineering consequences, and those are what interviews and production incidents are actually about. This walks the computation end to end and then follows the costs.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~3.4k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~16m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
 </section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#problem">The problem attention solves</a></li>
+      <li><a href="#attention">Scaled dot-product attention</a></li>
+      <li><a href="#heads">Multi-head attention</a></li>
+      <li><a href="#block">The block, end to end</a></li>
+      <li><a href="#position">Position, and why RoPE won</a></li>
+      <li><a href="#cache">The KV cache</a></li>
+      <li><a href="#cost">What context length actually costs</a></li>
+      <li><a href="#params">Where the parameters live</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="problem">
+  <div class="prose">
+    <h2>The problem attention solves</h2>
+
+    <p>Before transformers, sequence models processed tokens one at a time, carrying a hidden state forward. That design has two defects that turned out to be fatal.</p>
+
+    <p><b>It is inherently sequential.</b> You cannot compute step 50 until you have computed step 49, so training cannot be parallelised across the sequence. On modern accelerators, which are enormous parallel arithmetic engines, this leaves most of the hardware idle.</p>
+
+    <p><b>Information has to survive the journey.</b> For token 200 to use something from token 3, that information must be carried through 197 successive state updates, each of which can overwrite it. Gated architectures mitigated this and did not solve it.</p>
+
+    <p>Attention's answer is direct: let every position look at every other position, in one operation, in parallel. Token 200 reads token 3 directly. Nothing has to survive anything.</p>
+
+    <p>The price is that "every position looks at every other" means n² comparisons, and that quadratic term is the source of most of what follows in this article.</p>
+  </div>
+</section>
+
+<section class="section" id="attention">
+  <div class="prose">
+    <h2>Scaled dot-product attention</h2>
+
+    <p>Each token produces three vectors by multiplying its embedding by three learned matrices:</p>
+
+    <p><b>Query</b> — what this token is looking for. <b>Key</b> — what this token offers. <b>Value</b> — what this token contributes if selected.</p>
+
+    <p>The database analogy is worth keeping, because it is genuinely accurate: you match queries against keys to decide how much of each value to retrieve. The difference is that the match is soft — every key matches to some degree — which is precisely what makes it differentiable and therefore learnable.</p>
+
+<pre><code><span class="c-com"># x: [seq, d_model]</span>
+Q = x @ W_q          <span class="c-com"># [seq, d_k]</span>
+K = x @ W_k          <span class="c-com"># [seq, d_k]</span>
+V = x @ W_v          <span class="c-com"># [seq, d_v]</span>
+
+scores  = Q @ K.T / sqrt(d_k)        <span class="c-com"># [seq, seq]</span>
+scores  = scores + causal_mask       <span class="c-com"># -inf above the diagonal</span>
+weights = softmax(scores, axis=-<span class="c-num">1</span>)   <span class="c-com"># rows sum to 1</span>
+out     = weights @ V                <span class="c-com"># [seq, d_v]</span>
+</code></pre>
+
+    <p>Four lines. That is the mechanism in its entirety.</p>
+
+    <h3>Why divide by the square root of d<sub>k</sub></h3>
+
+    <p>This is the detail interviews ask about, and the answer is a variance argument rather than a convention.</p>
+
+    <p>Take two vectors whose components are independent with mean 0 and variance 1. Their dot product is a sum of d<sub>k</sub> such products, so it has variance d<sub>k</sub> and typical magnitude proportional to √d<sub>k</sub>. With a head dimension of 64, scores routinely land around ±8 before scaling.</p>
+
+    <p>Feed scores of that magnitude into softmax and it saturates: one entry goes to nearly 1, the rest to nearly 0. The gradient of softmax in that regime is approximately zero, so nothing learns. Dividing by √d<sub>k</sub> restores unit variance regardless of head dimension and keeps softmax in a region where gradients flow.</p>
+
+    <h3>The causal mask</h3>
+
+    <p>For a language model, token 5 must not see tokens 6 onward — otherwise the training objective is trivial, since the answer is in the input. The mask sets the upper triangle of the score matrix to negative infinity before softmax, which makes those weights exactly zero afterwards.</p>
+
+    <p>Using negative infinity rather than deleting entries is what keeps the operation a single dense matrix multiply, which is the whole point on parallel hardware. It is also why the compute cost is n² even though half the matrix is discarded.</p>
+  </div>
+</section>
+
+<section class="section" id="heads">
+  <div class="prose">
+    <h2>Multi-head attention</h2>
+
+    <p>One attention operation produces one weighted average per token, which forces a single notion of relevance. But the relationships in language are plural: a token relates to its syntactic head, to the entity it refers to, to the topic of the paragraph, and to the token that immediately precedes it, all at once. One averaging operation cannot represent all of those.</p>
+
+    <p>Multi-head attention runs h attention operations in parallel with separate learned projections, then concatenates the results and mixes them with a final output projection.</p>
+
+<pre><code><span class="c-com"># d_model = 512, h = 8  ->  d_head = 64</span>
+<span class="c-com"># Project once, then reshape into heads — one matmul, not eight.</span>
+Q = (x @ W_q).reshape(seq, h, d_head).transpose(<span class="c-num">1</span>, <span class="c-num">0</span>, <span class="c-num">2</span>)
+K = (x @ W_k).reshape(seq, h, d_head).transpose(<span class="c-num">1</span>, <span class="c-num">0</span>, <span class="c-num">2</span>)
+V = (x @ W_v).reshape(seq, h, d_head).transpose(<span class="c-num">1</span>, <span class="c-num">0</span>, <span class="c-num">2</span>)
+
+<span class="c-com"># attention per head, batched: [h, seq, seq] @ [h, seq, d_head]</span>
+heads = attention(Q, K, V)                     <span class="c-com"># [h, seq, d_head]</span>
+out   = heads.transpose(<span class="c-num">1</span>, <span class="c-num">0</span>, <span class="c-num">2</span>).reshape(seq, d_model) @ W_o
+</code></pre>
+
+    <p>The critical detail is that d<sub>head</sub> = d<sub>model</sub> / h. Eight heads of 64 dimensions cost the same as one head of 512 — multi-head attention is not more expensive, it is the same compute partitioned differently. That is why it was free to adopt.</p>
+
+    <p>The output projection <code>W_o</code> is not decoration. Without it the concatenated heads are just stacked side by side with no mixing, and each output dimension would depend on exactly one head.</p>
+  </div>
+
+  <figure class="fig">
+    <svg viewBox="0 0 880 340" role="img" aria-label="Diagram of multi-head attention. An input of shape sequence by d-model is projected into queries, keys and values, reshaped into h heads of dimension d-model over h, each head computes scaled dot-product attention producing a sequence by sequence score matrix, the head outputs are concatenated back to d-model and mixed by an output projection.">
+      <rect class="dg-box dg-box--accent" x="12" y="140" width="128" height="52"/>
+      <text class="dg-text" x="26" y="164">input x</text>
+      <text class="dg-text--dim" x="26" y="181">[seq, d_model]</text>
+
+      <path class="dg-line--accent" d="M140 166 H186"/><path class="dg-fill--accent" d="M180 162 l8 4 -8 4 z"/>
+
+      <rect class="dg-box" x="188" y="96" width="96" height="40"/>
+      <text class="dg-text" x="222" y="121">W_q</text>
+      <rect class="dg-box" x="188" y="146" width="96" height="40"/>
+      <text class="dg-text" x="222" y="171">W_k</text>
+      <rect class="dg-box" x="188" y="196" width="96" height="40"/>
+      <text class="dg-text" x="222" y="221">W_v</text>
+      <path class="dg-line" d="M186 166 V116 H188"/>
+      <path class="dg-line" d="M186 166 V216 H188"/>
+
+      <text class="dg-text--dim" x="300" y="80">reshape to h heads, d_head = d_model / h</text>
+      <line class="dg-line" x1="300" y1="88" x2="600" y2="88" stroke-dasharray="3 4"/>
+
+      <rect class="dg-box" x="300" y="100" width="150" height="46"/>
+      <text class="dg-text" x="314" y="120">head 1</text>
+      <text class="dg-text--dim" x="314" y="137">softmax(QK/√d)V</text>
+      <rect class="dg-box" x="300" y="156" width="150" height="46"/>
+      <text class="dg-text" x="314" y="176">head 2</text>
+      <text class="dg-text--dim" x="314" y="193">[seq, seq] scores</text>
+      <rect class="dg-box" x="300" y="212" width="150" height="46"/>
+      <text class="dg-text--dim" x="314" y="240">… head h</text>
+
+      <path class="dg-line" d="M284 116 H300"/><path class="dg-fill" d="M294 112 l8 4 -8 4 z"/>
+      <path class="dg-line" d="M284 166 H292 V179 H300"/><path class="dg-fill" d="M294 175 l8 4 -8 4 z"/>
+      <path class="dg-line" d="M284 216 H292 V235 H300"/><path class="dg-fill" d="M294 231 l8 4 -8 4 z"/>
+
+      <rect class="dg-box" x="500" y="140" width="128" height="52"/>
+      <text class="dg-text" x="514" y="164">concat</text>
+      <text class="dg-text--dim" x="514" y="181">[seq, d_model]</text>
+
+      <path class="dg-line" d="M450 123 H476 V166 H500"/><path class="dg-fill" d="M494 162 l8 4 -8 4 z"/>
+      <path class="dg-line" d="M450 179 H476"/>
+      <path class="dg-line" d="M450 235 H476 V166"/>
+
+      <rect class="dg-box dg-box--accent" x="676" y="140" width="128" height="52"/>
+      <text class="dg-text" x="690" y="164">W_o</text>
+      <text class="dg-text--dim" x="690" y="181">mixes the heads</text>
+      <path class="dg-line--accent" d="M628 166 H676"/><path class="dg-fill--accent" d="M670 162 l8 4 -8 4 z"/>
+
+      <text class="dg-text--dim" x="300" y="292">h heads of d_model/h cost exactly the same as one head of d_model —</text>
+      <text class="dg-text--dim" x="300" y="310">multi-head is the same compute partitioned, not extra compute.</text>
+    </svg>
+    <figcaption>The reshape is the whole trick: one projection matmul produces all heads at once, and the head dimension is carved out of d_model rather than added to it.</figcaption>
+  </figure>
+</section>
+
+<section class="section" id="block">
+  <div class="prose">
+    <h2>The block, end to end</h2>
+
+    <p>A transformer block is attention plus a feed-forward network, each wrapped in a residual connection and a normalisation layer. Modern models place the norm <i>before</i> each sublayer rather than after:</p>
+
+<pre><code><span class="c-com"># Pre-norm block. The residual stream is never normalised —
+# it runs clean from input to output, which is what lets
+# gradients reach early layers in a very deep stack.</span>
+x = x + attention(norm(x))
+x = x + feed_forward(norm(x))
+</code></pre>
+
+    <p>The feed-forward network is two linear layers with a non-linearity between them, expanding to roughly four times d<sub>model</sub> and back:</p>
+
+<pre><code>def feed_forward(x):                <span class="c-com"># d_ff is typically 4 * d_model</span>
+    <span class="c-kw">return</span> (gelu(x @ W_1 + b_1)) @ W_2 + b_2
+</code></pre>
+
+    <p>It is worth being clear about the division of labour, because it is frequently misstated. <b>Attention moves information between positions. The feed-forward network processes each position independently.</b> The feed-forward network sees one token at a time and has no idea the others exist. All cross-token communication happens in attention, and nowhere else.</p>
+
+    <h3>Why pre-norm rather than post-norm</h3>
+
+    <p>The original architecture applied normalisation after the residual addition. That works, but it requires a carefully tuned learning-rate warmup to train deep models without diverging — the residual path passes through a normalisation layer, so the gradient gets rescaled at every block.</p>
+
+    <p>Pre-norm normalises the input to each sublayer and leaves the residual stream untouched. The gradient now has a clean identity path from the output all the way to the first layer, and training becomes markedly more stable at depth. The trade is slightly worse final quality at equal depth in some settings, which is why the architecture is universal at large scale and not universal at small.</p>
+
+    <p>Most recent large models also use RMSNorm rather than LayerNorm — it drops the mean-centring and keeps only the scaling, which is cheaper and empirically works as well.</p>
+  </div>
+</section>
+
+<section class="section" id="position">
+  <div class="prose">
+    <h2>Position, and why RoPE won</h2>
+
+    <p>Attention as described is permutation-invariant. Shuffle the input tokens and the set of outputs is the same set, reordered. "Dog bites man" and "man bites dog" are indistinguishable. Something has to inject order.</p>
+
+    <p><b>Absolute learned embeddings.</b> Add a learned vector per position. Simple, effective, and fundamentally limited: position 5000 has no embedding if you trained to 2048, so the model cannot extrapolate at all.</p>
+
+    <p><b>Sinusoidal encodings.</b> Add fixed sinusoids of varying frequency. Deterministic and defined at any position, so they extrapolate in principle. In practice quality still degrades well beyond the training length.</p>
+
+    <p><b>Rotary position embeddings (RoPE).</b> Do not add anything. Instead, rotate the query and key vectors by an angle proportional to their position, treating consecutive pairs of dimensions as coordinates in a plane.</p>
+
+    <p>The reason this is the right idea is a small piece of algebra. Attention depends on q·k. If you rotate q by angle mθ and k by angle nθ, then the dot product of the rotated vectors depends only on (m − n) — the <i>difference</i> in position. Absolute position vanishes and relative position remains.</p>
+
+    <p>That is exactly the property language needs. The relationship between adjacent tokens is the same relationship whether they sit at positions 5 and 6 or 5005 and 5006, and RoPE encodes it identically in both cases. Different dimension pairs use different frequencies, so some encode fine local structure and others encode coarse long-range structure.</p>
+
+    <p>It also degrades more gracefully past the trained length, and — more usefully — its structure is explicit enough to manipulate. Position interpolation rescales the rotation frequencies so a longer sequence maps back into the trained angular range, and frequency-aware variants scale the high- and low-frequency bands differently on the reasoning that local detail should be preserved while long-range resolution is stretched. Both usually need a short fine-tune to recover quality, but they work, and they are the reason context windows have been extended after training rather than only by retraining.</p>
+  </div>
+</section>
+
+<section class="section" id="cache">
+  <div class="prose">
+    <h2>The KV cache</h2>
+
+    <p>Generation is autoregressive: produce a token, append it, produce the next. Done naively, each step re-runs the whole model over the whole sequence, so generating n tokens costs O(n²) forward passes worth of work — and in practice, an unusable amount.</p>
+
+    <p>The saving observation is that <b>the keys and values of previous tokens never change.</b> Token 3's key was computed from token 3's embedding and the weights; nothing about appending token 47 alters it. So compute them once and keep them.</p>
+
+<pre><code><span class="c-com"># Prefill: process the whole prompt once, keep K and V.</span>
+K_cache, V_cache = project_kv(prompt)     <span class="c-com"># [layers, heads, n_prompt, d_head]</span>
+
+<span class="c-com"># Decode: each new token contributes one row to the cache
+# and attends over everything accumulated so far.</span>
+<span class="c-kw">for</span> step <span class="c-kw">in</span> <span class="c-fn">range</span>(max_new_tokens):
+    q, k, v = project_qkv(last_token)     <span class="c-com"># one position only</span>
+    K_cache = concat(K_cache, k)
+    V_cache = concat(V_cache, v)
+    logits  = attend(q, K_cache, V_cache)
+    last_token = sample(logits)
+</code></pre>
+
+    <p>This turns generation from quadratic into linear, and it is why interactive language models are possible at all.</p>
+
+    <h3>It also relocates the bottleneck</h3>
+
+    <p>The cache is large, and its size is the constraint that governs serving economics:</p>
+
+<pre><code>kv_bytes = <span class="c-num">2</span>                 <span class="c-com"># K and V</span>
+         * n_layers
+         * n_kv_heads
+         * d_head
+         * seq_len
+         * batch_size
+         * bytes_per_element
+
+<span class="c-com"># Two things follow immediately:
+#   the cache grows linearly with BOTH context length and batch size,
+#   so long contexts directly reduce how many users you can serve.</span>
+</code></pre>
+
+    <p>Put concrete numbers from your own model into that and you get the batch size at which you run out of memory — which is to say, your maximum throughput, which is to say, your cost per request. This calculation deserves to be done before deployment rather than discovered under load.</p>
+
+    <p>Two optimisations exist specifically because of it. <b>Grouped-query attention</b> lets several query heads share one key/value head, cutting <code>n_kv_heads</code> and therefore the cache by the group factor, at a modest quality cost. <b>Paged attention</b> allocates the cache in fixed blocks rather than contiguous per-sequence buffers, which removes the fragmentation waste from reserving worst-case length for every request.</p>
+  </div>
+</section>
+
+<section class="section" id="cost">
+  <div class="prose">
+    <h2>What context length actually costs</h2>
+
+    <p>"Long context is expensive" is true and too vague to act on. The components scale differently and the dominant one depends on which phase you are in.</p>
+  </div>
+
+  <div class="scroll-x" style="margin-top:var(--sp-5)">
+    <table>
+      <caption>Scaling by component. n is sequence length, d is d_model.</caption>
+      <thead>
+        <tr><th>Component</th><th>Scales as</th><th>Dominates during</th><th>Practical consequence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Attention scores</td><td>O(n²·d)</td><td>Prefill</td><td>Doubling the prompt roughly quadruples the cost of processing it</td></tr>
+        <tr><td>Feed-forward</td><td>O(n·d²)</td><td>Prefill</td><td>Linear; dominates the total until n approaches d</td></tr>
+        <tr><td>KV cache memory</td><td>O(n·batch)</td><td>Whole request</td><td>Caps concurrency — the real limit on throughput</td></tr>
+        <tr><td>Per-token decode</td><td>O(n) and rising</td><td>Decode</td><td>Each new token attends over a longer cache, so later tokens cost more than earlier ones</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Two consequences people find counterintuitive.</p>
+
+    <p><b>The feed-forward network often dominates prefill, not attention.</b> Attention is quadratic in n and the feed-forward is quadratic in d. For a model with d = 4096 and a prompt of 1,000 tokens, d ≫ n and the feed-forward is the larger term. Attention only takes over once n approaches d. So "attention is the bottleneck" is a statement about very long contexts, not about all contexts.</p>
+
+    <p><b>A long conversation gets progressively more expensive per token.</b> Each decode step attends over the accumulated cache, so token 4000 costs measurably more than token 40. Users experience this as a chat that slows down as it goes, and it is not their imagination.</p>
+
+    <p>Memory-efficient attention implementations change the constant substantially — by keeping tiles of the computation in fast on-chip memory they avoid ever materialising the full n×n score matrix, which removes the quadratic <i>memory</i> cost — but the arithmetic remains quadratic. They make long context practical; they do not make it cheap.</p>
+  </div>
+</section>
+
+<section class="section" id="params">
+  <div class="prose">
+    <h2>Where the parameters live</h2>
+
+    <p>A useful thing to be able to work out on a whiteboard, because it grounds every other intuition about these models.</p>
+
+<pre><code>per block:
+  attention   4 * d_model²        <span class="c-com"># W_q, W_k, W_v, W_o</span>
+  feed-forward 2 * d_model * d_ff  <span class="c-com"># = 8 * d_model²  when d_ff = 4d</span>
+  ------------------------------------------------
+  total       12 * d_model² per block
+
+whole model:  n_layers * 12 * d_model²  +  vocab * d_model
+</code></pre>
+
+    <p>Two facts fall out of this that are worth carrying.</p>
+
+    <p><b>Roughly two thirds of the parameters are in the feed-forward layers, not in attention.</b> Attention gets the attention, but the feed-forward network is where most of the model's capacity sits — which is consistent with the evidence that a great deal of factual knowledge is stored there.</p>
+
+    <p><b>The embedding matrix is significant for small models and negligible for large ones.</b> With a 50,000-token vocabulary and d = 768, embeddings are about 38M parameters — a large fraction of a 120M model. At d = 8192 the same vocabulary is 400M parameters against tens of billions elsewhere, which is a rounding error. This is why vocabulary size is a real design decision for small models and mostly is not for large ones.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the compressed version</span>
+      <p>Attention moves information between positions; the feed-forward network processes each position alone and holds most of the parameters. Scaling by √d<sub>k</sub> keeps softmax out of saturation. Pre-norm keeps the residual stream clean so deep stacks train. RoPE encodes relative position through rotation, which is why context can be extended after training. The KV cache makes generation linear and then becomes the memory constraint that decides your batch size, your throughput and your cost.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> if you want more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="inference.html">inference economics</a></span><span class="sep">|</span><span class="v"><a href="finetuning.html">fine-tuning decisions</a></span><span class="sep">|</span><span class="v"><a href="../interview.html">LLM interview questions</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
 </div>
 </main>

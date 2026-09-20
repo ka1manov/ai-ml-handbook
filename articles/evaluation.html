@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Evaluation Engineering for LLM Systems</title>
-<meta name="description" content="Golden sets, task decomposition, programmatic checks before model-based ones, calibrating an LLM judge, regression suites in CI, and online evaluation.">
+<meta name="description" content="Golden sets, task decomposition, programmatic checks before model-based ones, calibrating an LLM judge, regression suites in CI, and online evaluation — how to make an LLM product improvable rather than merely changeable.">
 <link rel="canonical" href="https://ka1manov.github.io/ai-ml-handbook/articles/evaluation.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="The AI/ML Engineering Handbook">
 <meta property="og:title" content="Evaluation Engineering for LLM Systems">
-<meta property="og:description" content="Golden sets, task decomposition, programmatic checks before model-based ones, calibrating an LLM judge, regression suites in CI, and online evaluation.">
+<meta property="og:description" content="Golden sets, task decomposition, programmatic checks before model-based ones, calibrating an LLM judge, regression suites in CI, and online evaluation — how to make an LLM product improvable rather than merely changeable.">
 <meta property="og:url" content="https://ka1manov.github.io/ai-ml-handbook/articles/evaluation.html">
 <meta property="og:image" content="https://ka1manov.github.io/ai-ml-handbook/assets/img/og-articles.png">
 <meta property="og:image:width" content="1200">
@@ -63,11 +63,263 @@
 </header>
 <main id="main">
 <div class="shell">
-<section class="pagehead">
-<h1>Evaluation Engineering for LLM Systems</h1>
-<p class="lede">Being written.</p>
-<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">pytest evals/ --tb=short</p>
+  <h1>Evaluation engineering</h1>
+  <p class="lede">Without evaluation you are not engineering an LLM system, you are changing it. This is how to build the instrument: what to measure, what to measure it with, how to calibrate a judge so its numbers mean something, and how to wire the whole thing into CI so quality cannot silently fall.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~3.2k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~15m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
 </section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#why">Why this is the highest-leverage work</a></li>
+      <li><a href="#golden">Building the golden set</a></li>
+      <li><a href="#decompose">Decompose before you measure</a></li>
+      <li><a href="#programmatic">Programmatic checks first</a></li>
+      <li><a href="#judge">LLM-as-judge, calibrated</a></li>
+      <li><a href="#stats">Is the difference real?</a></li>
+      <li><a href="#ci">Wiring it into CI</a></li>
+      <li><a href="#online">Online evaluation</a></li>
+      <li><a href="#antipatterns">Anti-patterns</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="why">
+  <div class="prose">
+    <h2>Why this is the highest-leverage work</h2>
+
+    <p>Deterministic software has a property LLM systems do not: you can tell whether it is correct. A function either returns the right value or it does not, and a test asserts it.</p>
+
+    <p>An LLM system's output is a distribution over acceptable answers, and "acceptable" is frequently a judgement. That has a consequence people underestimate until it bites: <b>without a measurement, you cannot tell whether a change helped.</b></p>
+
+    <p>What happens without one is consistent across every team I have seen do it. Someone edits a prompt, reads three outputs, decides it seems better, and ships. A week later someone else improves something different and a behaviour that used to work no longer does. Nobody can say when it broke or which change did it, because there was never a number. The product changes constantly and improves randomly.</p>
+
+    <p>The argument for building it first is not rigour, it is speed. With an evaluation suite you can refactor prompts without fear, compare models in an afternoon, adopt a new base model when it ships, and answer "did that help?" with evidence. Every one of those is faster than the alternative, and the gap widens over the life of the product.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the minimum viable version</span>
+      <p>Fifty real examples with a defined notion of a good response, and a script that runs them and prints a number. That is one day of work.</p>
+      <p>It is not a research-grade benchmark and it does not need to be. It needs to be enough to notice when you make things worse, and fifty examples will do that.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="golden">
+  <div class="prose">
+    <h2>Building the golden set</h2>
+
+    <p>Everything rests on this, so it is worth doing deliberately.</p>
+
+    <p><b>Use real inputs.</b> From support tickets, query logs, user interviews, or the humans currently doing the work. Examples you invent are shaped by your assumptions about the task, which are exactly the assumptions you need the evaluation to test. A set of invented examples produces a system that handles invented examples.</p>
+
+    <p><b>Size: 50 is useful, 200 is comfortable, 1000 is a research budget.</b> What matters far more than size is coverage, and adding a hundred more examples of the case you already handle adds nothing.</p>
+
+    <p><b>Stratify deliberately.</b> Your set should contain, by design rather than by luck:</p>
+
+    <p>The common case, in proportion. The hard-but-valid cases where the answer requires real work. Ambiguous inputs where the correct behaviour is to ask a clarifying question. <b>Inputs the system should refuse or say it cannot answer</b> — a system that always answers has not been tested, and this is the slice that most often exposes the difference between a good system and a confident one. Adversarial inputs, including injection attempts. And known past failures, added as they are found, so a fixed bug cannot return unnoticed.</p>
+
+    <p><b>Define what good means, precisely enough for someone else to apply it.</b> "A good summary" is not a specification. "Includes the decision and the owner, under 100 words, no information absent from the source" is. If two people on your team would score the same output differently, the rubric is not finished.</p>
+
+    <p><b>Version it and freeze it.</b> The evaluation set is a measuring instrument. Changing it changes what the numbers mean, so changes should be deliberate, recorded, and accompanied by a re-baseline rather than slipped in.</p>
+
+    <div class="callout callout--warn">
+      <span class="callout__label">the contamination trap</span>
+      <p>Do not generate your evaluation set with the same model you are evaluating. You will measure agreement with that model's own tendencies, not quality, and the score will look excellent.</p>
+      <p>The same applies to generating evaluation questions from your corpus: those questions are shaped like your corpus and will flatter your retrieval. Real user questions are phrased differently from the documents that answer them, and that mismatch is precisely what retrieval has to overcome.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="decompose">
+  <div class="prose">
+    <h2>Decompose before you measure</h2>
+
+    <p>A single end-to-end quality score is the most common evaluation design and the least useful one, because when it moves you do not know why.</p>
+
+    <p>Measure each stage that can fail independently:</p>
+
+<pre><code><span class="c-com"># A RAG pipeline has at least four measurable stages.</span>
+
+router      → did it correctly decide whether to retrieve?
+retrieval   → recall@k, precision@k, nDCG@k
+generation  → faithfulness to the retrieved context
+end-to-end  → did the user get a correct, useful answer?
+
+<span class="c-com"># The ordering matters: a failure upstream makes every
+# downstream measurement meaningless. There is no point
+# debugging generation while retrieval is broken.</span>
+</code></pre>
+
+    <p>The payoff is diagnostic. When end-to-end quality drops, the stage metrics tell you immediately which component regressed, and you skip the day of bisecting by hand. It also tells you where the ceiling is: if recall@10 is 0.6, generation quality cannot exceed what 60% coverage allows, and improving the prompt is wasted effort.</p>
+
+    <p>The same applies to agents — per-step success and end-to-end success are different numbers, and the gap between them is where error compounding lives. A 95% per-step rate over ten steps is roughly 60% end to end, and only measuring both makes that visible.</p>
+  </div>
+</section>
+
+<section class="section" id="programmatic">
+  <div class="prose">
+    <h2>Programmatic checks first</h2>
+
+    <p>Before anything judges anything, write the assertions a computer can make. They are free, deterministic, instant, and they catch a surprising share of real defects.</p>
+
+<pre><code><span class="c-com"># These need no model and no human. Run them on every output.</span>
+
+def check(output, context, question):
+    assert is_valid_json(output)                     <span class="c-com"># schema</span>
+    assert set(output) >= REQUIRED_FIELDS
+    assert len(output[<span class="c-str">"summary"</span>].split()) &lt;= <span class="c-num">100</span>     <span class="c-com"># length</span>
+    assert output[<span class="c-str">"citations"</span>]                        <span class="c-com"># cited at all</span>
+    <span class="c-kw">for</span> cid <span class="c-kw">in</span> output[<span class="c-str">"citations"</span>]:
+        assert cid <span class="c-kw">in</span> context.chunk_ids                <span class="c-com"># not fabricated</span>
+    assert <span class="c-kw">not</span> PII_PATTERN.search(output[<span class="c-str">"summary"</span>])
+    assert detect_language(output) == expected_language
+</code></pre>
+
+    <p>The citation check deserves particular attention, because fabricated citations are one of the most damaging failures a grounded system can have — the answer <i>looks</i> verifiable, which makes users trust it more, not less. Validating that every cited id exists in the retrieved set is three lines and it makes that failure impossible to ship.</p>
+
+    <p>Beyond assertions, the deterministic metrics: exact match where there is one right answer, numeric tolerance for extracted figures, set overlap for extracted entities, and reference-based text metrics where a reference answer exists — with the caveat that string-overlap metrics correlate poorly with quality on open-ended generation and should not carry much weight.</p>
+
+    <p>Every check you can express in code is one you never pay a model to perform, never wait on, and never argue about.</p>
+  </div>
+</section>
+
+<section class="section" id="judge">
+  <div class="prose">
+    <h2>LLM-as-judge, calibrated</h2>
+
+    <p>For the genuinely subjective remainder — is this summary faithful, is this tone right, is this answer helpful — a model scoring outputs is the practical option at any scale.</p>
+
+    <p>It is also a measuring instrument, and an uncalibrated instrument produces confident numbers that mean nothing. The known biases are specific and worth designing around:</p>
+
+    <p><b>Position bias.</b> In pairwise comparison, judges favour one position. Evaluate both orderings and average; a large disagreement between orderings is itself a signal that the two outputs are close.</p>
+
+    <p><b>Verbosity bias.</b> Judges prefer longer answers largely independently of quality. Either control for length in the comparison or instruct the judge to disregard it — and then verify the instruction worked by checking whether score correlates with length.</p>
+
+    <p><b>Self-preference.</b> Judges score outputs from their own model family more highly. Using a different model to judge than to generate is cheap insurance against measuring your own reflection.</p>
+
+    <p><b>Scale compression.</b> Asked for 1–10, judges cluster in 6–8 and the scale carries less information than it appears to. Binary or three-point rubrics with explicit criteria are substantially more reliable.</p>
+
+    <h3>Writing a judge prompt that works</h3>
+
+    <p>Give it the criterion, not the question. "Rate this answer's quality" invites the model's general aesthetic preferences. "Does every factual claim in this answer appear in the provided context? Answer yes or no, then list any claim that does not" is a checkable question with a defensible answer.</p>
+
+    <p>Ask for the reasoning before the verdict — a judge that commits to a score and then explains it rationalises, while one that examines first and concludes after is more accurate. Provide the rubric with a worked example of each category. And request a structured output so parsing is not its own failure mode.</p>
+
+    <div class="callout callout--warn">
+      <span class="callout__label">the calibration step, which is not optional</span>
+      <p>Hand-label 50 to 100 outputs. Run the judge on the same ones. Compute agreement — Cohen's kappa for categorical judgements, correlation for scores.</p>
+      <p><b>That number is the credibility of every result the judge produces afterwards.</b> If you cannot state it, your evaluation pipeline is generating numbers rather than evidence, and decisions based on it are decisions based on nothing.</p>
+      <p>Re-calibrate when you change the judge model or the rubric, because both change the instrument. And if agreement is poor, the usual cause is an underspecified rubric rather than a weak judge — the fix is to sharpen the criterion.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="stats">
+  <div class="prose">
+    <h2>Is the difference real?</h2>
+
+    <p>Your new prompt scores 0.84 against the old one's 0.81 on 100 examples. Ship it?</p>
+
+    <p>Not on that alone. On 100 examples, a three-point difference is comfortably inside the noise, and shipping it is a coin flip you have dressed up as a decision.</p>
+
+    <p>The right tool is a paired bootstrap, and the important word is <i>paired</i>: both variants are evaluated on the same examples, so their errors are correlated and comparing them directly has far more statistical power than comparing two independent intervals.</p>
+
+<pre><code><span class="c-com"># Paired bootstrap over the per-example score difference.</span>
+def bootstrap_diff(scores_a, scores_b, n=<span class="c-num">10000</span>):
+    diffs = np.array(scores_a) - np.array(scores_b)   <span class="c-com"># paired</span>
+    means = [np.mean(np.random.choice(diffs, len(diffs), replace=<span class="c-kw">True</span>))
+             <span class="c-kw">for</span> _ <span class="c-kw">in</span> <span class="c-fn">range</span>(n)]
+    <span class="c-kw">return</span> np.percentile(means, [<span class="c-num">2.5</span>, <span class="c-num">97.5</span>])
+
+<span class="c-com"># If the interval straddles zero, you have not established
+# a difference. That is a result, not a failure — it tells you
+# the change is not worth the risk, or the set is too small.</span>
+</code></pre>
+
+    <p>Two further cautions.</p>
+
+    <p><b>Multiple comparisons.</b> If you tried forty prompt variants and are reporting the best, the winner is optimistically biased by selection regardless of what any single test says. Confirm on a held-out set that took no part in the search.</p>
+
+    <p><b>Power.</b> Before running the comparison, ask what effect size your set can detect. If a three-point difference is undetectable at n=100, then either enlarge the set or accept that you are choosing between variants you cannot distinguish — and make that choice on cost or latency instead, which at least are measurable.</p>
+  </div>
+</section>
+
+<section class="section" id="ci">
+  <div class="prose">
+    <h2>Wiring it into CI</h2>
+
+    <p>An evaluation suite that runs when someone remembers is not a safety net. The value comes from it being unavoidable.</p>
+
+    <p><b>Every commit</b> — the fast, deterministic layer: programmatic checks, schema validation, and a small prompt regression suite with fixed inputs. Seconds to a couple of minutes. No model calls if you can avoid them, or cached ones if you cannot.</p>
+
+    <p><b>Every pull request touching prompts, retrieval or model config</b> — retrieval metrics and the cheaper evaluation set, with results posted to the PR so the reviewer sees the quality delta next to the diff. A prompt change that drops recall by four points should be as visible as a failing unit test.</p>
+
+    <p><b>Nightly and on release candidates</b> — the full suite including judge-based scoring, plus segment breakdowns. Expensive, slow, and it does not need to block a commit.</p>
+
+    <p>Two things make this work in practice and their absence is why most attempts die:</p>
+
+    <p><b>Determinism.</b> Pin the model version, pin dependencies, fix seeds, set temperature to zero for evaluation, and cache what you can. A flaky quality gate gets disabled within two weeks and then you have nothing — this is the single most common way evaluation infrastructure is lost.</p>
+
+    <p><b>Thresholds with hysteresis.</b> Fail on a meaningful regression, not on any movement. Set the gate outside the noise band you measured, so it fires on real changes and not on resampling.</p>
+  </div>
+</section>
+
+<section class="section" id="online">
+  <div class="prose">
+    <h2>Online evaluation</h2>
+
+    <p>Offline evaluation is a fixed sample of a shifting reality. It will not catch everything, and the gap between it and production is where most unpleasant surprises live.</p>
+
+    <p><b>Explicit feedback</b> — thumbs up and down. Low volume, heavily biased toward extremes, and still useful because the negatives are a direct feed into your golden set.</p>
+
+    <p><b>Implicit signals</b>, which are higher volume and often more informative. Did the user click a citation. Did they copy the output. Did they immediately rephrase and ask again — <b>a rephrase directly after an answer is one of the strongest available signals that the answer was bad</b>, and it costs nothing to instrument. Did they escalate to a human. Did they complete the task.</p>
+
+    <p><b>Production sampling.</b> Take a random sample of real traffic daily, run your judge over it, and track the score. This catches drift that a fixed evaluation set structurally cannot, because the set does not change and your traffic does.</p>
+
+    <p><b>A/B tests</b> for changes significant enough to warrant one, with the business outcome as the primary metric and the model metric as a diagnostic.</p>
+
+    <p>Then close the loop, which is the part that turns evaluation from a gate into an engine: every production failure you investigate becomes a new example in the golden set. That is what makes the suite get better at catching the failures you actually have, rather than the ones you imagined at the start.</p>
+  </div>
+</section>
+
+<section class="section" id="antipatterns">
+  <div class="prose">
+    <h2>Anti-patterns</h2>
+
+    <p><b>Vibes-based iteration.</b> Reading a handful of outputs and forming an impression. Fine for exploration, disastrous as a decision procedure, and it is the default state of most teams.</p>
+
+    <p><b>Evaluating only the happy path.</b> No refusals, no ambiguity, no adversarial inputs. Produces a system that is excellent until it meets a real user.</p>
+
+    <p><b>Optimising the judge instead of the system.</b> If your judge is the target, you will eventually find the prompt that pleases it rather than the one that helps users. Calibration against human labels is what keeps the judge anchored to something real.</p>
+
+    <p><b>One number for everything.</b> Faithfulness, helpfulness, format compliance and safety fail independently and need separate measurement. A single blended score lets a regression in one hide behind an improvement in another.</p>
+
+    <p><b>Letting the evaluation set drift into the training set.</b> If you iterate against a set long enough you are fitting it, and its number stops predicting production. Keep a held-out set you look at rarely and deliberately.</p>
+
+    <p><b>Measuring what is easy instead of what matters.</b> Token overlap with a reference is easy and correlates weakly with usefulness. It is better to have a coarse measure of the right thing than a precise measure of the wrong one.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the compressed version</span>
+      <p>Fifty real examples, including the ones that should fail. Measure each stage separately. Assert in code before you judge with a model. Calibrate the judge against human labels and report the agreement. Use a paired bootstrap before believing a small difference. Run it in CI and keep it deterministic. Feed production failures back in. Build it before the feature, because it is the thing that makes everything afterwards fast.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> for more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="../rag.html">RAG, properly</a></span><span class="sep">|</span><span class="v"><a href="agents.html">agent architectures</a></span><span class="sep">|</span><span class="v"><a href="../startups.html">eval-first development</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
 </div>
 </main>
 
@@ -113,6 +365,6 @@
 <script src="../assets/js/theme.js" defer></script>
 <script src="../assets/js/nav.js" defer></script>
 <script src="../assets/js/search.js" defer></script>
-<script src="../assets/js/progress.js" defer></script>
+<script src="../assets/js/rail.js" defer></script>
 </body>
 </html>
