@@ -107,6 +107,55 @@
       <p>This is why batching produces such enormous throughput gains during decode, and why an unbatched endpoint is leaving most of the hardware's value unused. It is also why speculative decoding works: verifying several candidate tokens costs barely more than verifying one.</p>
     </div>
 
+  </div>
+
+  <figure class="fig">
+    <svg viewBox="0 0 880 330" role="img" aria-label="Timeline comparing prefill and decode. Prefill processes all prompt tokens in one pass and is compute-bound, occupying a short wide block. Decode then generates one token per step, each step requiring a full read of the model weights from memory, shown as many narrow steps. A second timeline shows that batching barely helps prefill, which is already saturating the arithmetic units, but helps decode enormously because one weight read serves the whole batch.">
+      <text class="dg-text--accent" x="12" y="24">ONE REQUEST</text>
+      <line class="dg-line" x1="12" y1="32" x2="868" y2="32" stroke-dasharray="3 4"/>
+
+      <rect class="dg-box dg-box--accent" x="12" y="48" width="180" height="52"/>
+      <text class="dg-text" x="26" y="70">prefill</text>
+      <text class="dg-text--dim" x="26" y="88">all prompt tokens, 1 pass</text>
+
+      <rect class="dg-box" x="206" y="48" width="42" height="52"/>
+      <rect class="dg-box" x="256" y="48" width="42" height="52"/>
+      <rect class="dg-box" x="306" y="48" width="42" height="52"/>
+      <rect class="dg-box" x="356" y="48" width="42" height="52"/>
+      <rect class="dg-box" x="406" y="48" width="42" height="52"/>
+      <rect class="dg-box" x="456" y="48" width="42" height="52"/>
+      <text class="dg-text--dim" x="506" y="78">… one step per token</text>
+
+      <text class="dg-text--dim" x="12" y="120">compute-bound</text>
+      <text class="dg-text--dim" x="206" y="120">memory-bandwidth-bound: each step re-reads every weight</text>
+
+      <path class="dg-line--accent" d="M12 132 H192"/>
+      <path class="dg-line" d="M206 132 H660"/>
+      <text class="dg-text--accent" x="12" y="150">arithmetic units busy</text>
+      <text class="dg-text--dim" x="206" y="150">arithmetic units largely idle — waiting on memory</text>
+
+      <text class="dg-text--accent" x="12" y="204">SAME HARDWARE, BATCH OF 8</text>
+      <line class="dg-line" x1="12" y1="212" x2="868" y2="212" stroke-dasharray="3 4"/>
+
+      <rect class="dg-box dg-box--accent" x="12" y="228" width="180" height="52"/>
+      <text class="dg-text" x="26" y="250">prefill x8</text>
+      <text class="dg-text--dim" x="26" y="268">already saturated</text>
+
+      <rect class="dg-box dg-box--accent" x="206" y="228" width="42" height="52"/>
+      <rect class="dg-box dg-box--accent" x="256" y="228" width="42" height="52"/>
+      <rect class="dg-box dg-box--accent" x="306" y="228" width="42" height="52"/>
+      <rect class="dg-box dg-box--accent" x="356" y="228" width="42" height="52"/>
+      <rect class="dg-box dg-box--accent" x="406" y="228" width="42" height="52"/>
+      <rect class="dg-box dg-box--accent" x="456" y="228" width="42" height="52"/>
+      <text class="dg-text--accent" x="506" y="258">8 tokens per step</text>
+
+      <text class="dg-text--dim" x="12" y="300">~no gain: compute-bound</text>
+      <text class="dg-text--accent" x="206" y="300">~8x throughput: one weight read serves the whole batch</text>
+    </svg>
+    <figcaption>The bottom row is the whole argument for batching. Decode reads every weight from memory to produce one token, and that same read serves every sequence in the batch — so throughput scales with batch size almost for free, while prefill, already compute-bound, gains little.</figcaption>
+  </figure>
+
+  <div class="prose">
     <p>A second consequence: prefill and decode compete. A long prompt arriving mid-generation occupies the compute units and stalls decode for everyone in the batch — visible to users as a stutter in streaming output. Serving stacks handle this by chunking prefill into pieces that interleave with decode steps, trading a little prefill latency for much smoother generation across the batch.</p>
   </div>
 </section>

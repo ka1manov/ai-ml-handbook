@@ -89,6 +89,7 @@ still works**.
 | `node tools/build-pages.mjs` | Rebuilds the HTML from `src/*.part` so the shared chrome can't drift |
 | `node tools/build-index.mjs` | Regenerates the search index |
 | `node tools/contrast.mjs` | WCAG contrast gate over the palette, both themes |
+| `node tools/check-svg-labels.mjs` | Flags SVG labels that would overlap when rendered |
 | `python3 tools/build-interview.py` | Renders the question bank from JSON |
 
 ### Editing content
