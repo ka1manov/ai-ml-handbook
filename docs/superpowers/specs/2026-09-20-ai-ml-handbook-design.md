@@ -88,28 +88,47 @@ hours. Resolution: **terminal identity in the chrome, readability in the prose.*
 
 ### 5.2 Palette
 
-Dark is the default theme.
+Dark is the default theme. The two themes are different concepts rather than
+inversions of each other: **dark is an amber-phosphor CRT**, **light is line-printer
+output on continuous-feed paper**.
 
-| Token | Dark | Light | Role |
+Green was demoted from a second decorative accent to a purely functional state colour.
+Two decorative accents is the generic dark-theme move; a single amber identity is a
+choice. Amber (`#FFB000`) is the DEC VT220 / IBM 3270 monochrome phosphor — a
+historically specific artifact, and materially easier on the eyes across a two-hour
+read than green.
+
+| Token | Dark (CRT) | Light (printout) | Role |
 |---|---|---|---|
-| `--bg` | `#0B0D0C` | `#F4F1EA` | page ground |
-| `--bg-raised` | `#121514` | `#FFFFFF` | cards, window bodies |
-| `--bg-inset` | `#080A09` | `#EAE6DC` | code blocks, wells |
-| `--border` | `#242927` | `#D6D0C4` | 1px hairlines |
-| `--text` | `#D8DAD6` | `#1A1C1B` | body prose |
-| `--text-dim` | `#8A918C` | `#5C625E` | captions, meta |
-| `--accent` | `#FFB000` | `#9A5B00` | primary (amber phosphor) |
-| `--accent-alt` | `#4AF626` | `#1E7A12` | secondary (green phosphor) |
+| `--bg` | `#0C0B08` | `#F2EEE3` | page ground (warm-cast, not grey) |
+| `--bg-raised` | `#14120D` | `#FBF9F3` | cards, window bodies |
+| `--bg-inset` | `#080704` | `#E7E1D3` | code blocks, wells, title bars |
+| `--border` | `#2A2620` | `#CFC7B4` | 1px hairlines |
+| `--border-strong` | `#4A4438` | `#A89C82` | table heads, emphasis rules |
+| `--text` | `#E2DCCE` | `#1C1A15` | body prose (warm off-white) |
+| `--text-dim` | `#968E7C` | `#6A6252` | captions, meta |
+| `--accent` | `#FFB000` | `#8A5200` | the single identity colour |
+| `--ok` | `#7BC96F` | `#2D6A22` | state only: passed, complete, strong |
+| `--warn` | `#E8804A` | `#A33E12` | state only: caution, "do not use this" |
 
 Both themes verified at WCAG AA for body text and UI controls.
 
 ### 5.3 Typography
 
-- Chrome, headings, code, tags: `JetBrains Mono` with a full `ui-monospace, SFMono-Regular,
-  Menlo, Consolas, monospace` fallback stack.
-- Body prose: same mono family at a comfortable size, because the terminal identity is the
-  point — compensated with line-height and measure rather than a font switch.
-- Scale: 13 / 15 / 17 / 20 / 26 / 34 / 44px. No fluid clamps below 15px.
+**IBM Plex Mono**, one family, with the full `ui-monospace, SFMono-Regular, Menlo,
+Consolas, monospace` fallback stack. Chosen over JetBrains Mono for its humanist
+skeleton and true italics, which matter materially across 30,000 words.
+
+Body prose stays monospace because the terminal identity is the point. It is
+compensated with 16px / 1.8 line-height / 66ch measure, warm-toned rather than pure
+white text, and deliberate rhythm-breaking — a rule, callout, table or diagram at
+least every three screens, so no wall of monospace ever forms.
+
+`--font-prose` is a separate token aliased to `--font-mono`. If the monospace body
+proves heavy in reading, switching the body face is a one-line change that touches
+nothing else.
+
+Scale: 12 / 13 / 16 / 19 / 23 / 30 / 40px.
 
 ### 5.4 Restraint rules
 

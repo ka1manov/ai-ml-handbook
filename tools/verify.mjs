@@ -108,7 +108,7 @@ if (existsSync(cssPath)) {
   if (!/prefers-reduced-motion/.test(css)) failures.push('site.css: no prefers-reduced-motion block');
   if (/box-shadow:\s*(?!none)/.test(css)) failures.push('site.css: box-shadow is forbidden by the design system');
   if (/linear-gradient|radial-gradient/.test(css)) failures.push('site.css: gradients are forbidden by the design system');
-  for (const tok of ['--bg', '--bg-raised', '--bg-inset', '--border', '--text', '--text-dim', '--accent', '--accent-alt']) {
+  for (const tok of ['--bg', '--bg-raised', '--bg-inset', '--border', '--border-strong', '--text', '--text-dim', '--accent', '--ok', '--warn', '--graph', '--font-mono', '--font-prose', '--measure']) {
     if (!new RegExp(`\\${tok}:`).test(css)) failures.push(`site.css: missing token ${tok}`);
   }
 }
