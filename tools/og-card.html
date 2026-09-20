@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>OG card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* 1200x630 social card. Dark only — social cards do not adapt. */
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #0C0B08;
+    color: #E2DCCE;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 17px;
+    display: flex;
+    flex-direction: column;
+  }
+  .bar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 32px;
+    border-bottom: 1px solid #2A2620;
+    background: #080704;
+    font-size: 15px; color: #968E7C;
+  }
+  .dots { color: #4A4438; letter-spacing: .12em; }
+  .body { flex: 1; padding: 52px 56px 40px; display: flex; flex-direction: column; }
+  .prompt { color: #968E7C; font-size: 19px; margin-bottom: 30px; }
+  .prompt b { color: #FFB000; font-weight: 400; }
+  h1 {
+    font-size: 62px; line-height: 1.12; font-weight: 600;
+    letter-spacing: -.02em; max-width: 19ch;
+  }
+  .sub { margin-top: 26px; font-size: 21px; line-height: 1.55; color: #968E7C; max-width: 46ch; }
+  .foot {
+    margin-top: auto; display: flex; align-items: flex-end;
+    justify-content: space-between; gap: 32px;
+  }
+  .by { font-size: 24px; color: #FFB000; }
+  .by span { color: #968E7C; font-size: 19px; }
+  .meta { font-size: 17px; color: #968E7C; text-align: right; line-height: 1.7; }
+  .meta b { color: #E2DCCE; font-weight: 400; }
+  .rule { height: 1px; background: #2A2620; margin: 26px 0 20px; }
+  .cursor { display: inline-block; width: .55em; height: .95em; background: #FFB000; vertical-align: -2px; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <span class="dots">[_][□][X]</span>
+    <span>ka1manov@handbook: ~/ai-ml-handbook</span>
+  </div>
+  <div class="body">
+    <p class="prompt"><b>$</b> <span id="cmd">cat README.md</span></p>
+    <h1 id="title">The AI/ML Engineering Handbook</h1>
+    <p class="sub" id="sub">A staged roadmap, a RAG deep dive, 122 interview questions and a startup playbook — for people who ship systems, not notebooks.</p>
+    <div class="rule"></div>
+    <div class="foot">
+      <p class="by">@ka1manov <span>· free, no signup</span></p>
+      <p class="meta" id="meta"><b>~57k words</b> · ~2h read<br>ka1manov.github.io/ai-ml-handbook</p>
+    </div>
+  </div>
+<script>
+  const p = new URLSearchParams(location.search);
+  const set = (id, v) => { if (v) document.getElementById(id).innerHTML = v; };
+  set('title', p.get('t'));
+  set('sub', p.get('s'));
+  set('cmd', p.get('c'));
+  set('meta', p.get('m'));
+</script>
+</body>
+</html>
