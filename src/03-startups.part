@@ -1,0 +1,378 @@
+path: startups.html
+title: How Startups Should Actually Use AI
+ogtitle: How Startups Should Actually Use AI
+desc: Build, buy or fine-tune. Unit economics with the arithmetic shown. Eval-first development, why "we use an LLM" is not a moat, team composition by stage, and a 90-day plan.
+og: og-startups.png
+ogtype: article
+readbar: yes
+scripts: rail
+---
+<main id="main">
+<div class="shell">
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">cat ~/ai-ml-handbook/startups.md</p>
+  <h1>How startups should actually use AI</h1>
+  <p class="lede">Written for the founder or CTO deciding what to build. Not a survey of what is possible — a set of decisions, with the arithmetic shown, the failure patterns named, and an honest account of what is and is not defensible.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~5k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~25m</span><span class="sep">|</span><span class="k">for</span> <span class="v">founders, CTOs, first AI hires</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
+</section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#reality">What LLMs are good and bad at</a></li>
+      <li><a href="#shape">Is your problem AI-shaped?</a></li>
+      <li><a href="#ladder">The 0 to 1 ladder</a></li>
+      <li><a href="#decision">Build, buy or fine-tune</a></li>
+      <li><a href="#economics">Unit economics</a></li>
+      <li><a href="#evals">Eval-first development</a></li>
+      <li><a href="#moats">Moats, and what is not one</a></li>
+      <li><a href="#team">Who to hire, and when</a></li>
+      <li><a href="#failures">How AI startups fail</a></li>
+      <li><a href="#risk">Privacy, vendors and risk</a></li>
+      <li><a href="#plan">A 90-day plan</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="reality">
+  <div class="prose">
+    <h2>What LLMs are good and bad at</h2>
+
+    <p>Most bad AI product decisions come from a wrong model of the capability, so it is worth being blunt about the shape of it.</p>
+
+    <p><b>Genuinely good at:</b> transforming text from one form into another — summarising, rewriting, translating, extracting structure from prose. Classifying and routing. Drafting something a human will edit. Answering questions when the answer is in front of it. Writing code against a clear specification. Conversational interfaces over things that previously needed a form.</p>
+
+    <p><b>Genuinely bad at:</b> anything requiring guaranteed correctness. Arithmetic and precise counting. Knowing what it does not know. Consistency across many independent calls. Long chains of dependent reasoning without verification. Anything where being confidently wrong is worse than saying nothing.</p>
+
+    <p>The single most useful reframing: <b>an LLM is a very capable junior employee with no memory, infinite patience, no judgement about when to escalate, and the inability to tell you when it is out of its depth.</b> Design the product around that and you will make good decisions. Design it around "it is intelligent" and you will ship something that demos brilliantly and erodes trust in production.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the question that saves quarters</span>
+      <p>For your use case, what happens when the output is wrong? If the answer is "a human notices immediately and fixes it cheaply," you are in excellent territory and should move fast. If the answer is "it is silently wrong and acted upon," you need verification, human review, or a different product — and you need to design for that from the start, not add it after the first incident.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="shape">
+  <div class="prose">
+    <h2>Is your problem actually AI-shaped?</h2>
+
+    <p>The strongest LLM products share a shape, and recognising it early is worth more than any implementation detail.</p>
+
+    <p><b>The work is currently done by a human reading and writing text.</b> Support triage, document review, data entry from unstructured sources, research summarisation. There is an existing cost you can measure and an existing quality bar you can compare against — which means you can prove value rather than argue for it.</p>
+
+    <p><b>Volume is high and individual stakes are low.</b> Ten thousand documents where a 5% error rate costs little is a far better first product than a hundred documents where one error is catastrophic.</p>
+
+    <p><b>Verification is cheap.</b> The user can tell at a glance whether the output is right. This is why drafting tools work so well: reading a draft and fixing it is much faster than writing from scratch, so even mediocre output creates value.</p>
+
+    <p><b>The input is messy and the output is structured.</b> This is the transformation LLMs are unreasonably good at, and it is exactly where traditional software was weakest. Parsing arbitrary invoices into a schema was a hard problem for thirty years and is now largely a solved one.</p>
+
+    <div class="callout callout--kill">
+      <span class="callout__label">bad shapes, however good the demo</span>
+      <p><b>Regulated decisions requiring explainability.</b> Credit, hiring, medical diagnosis. Not impossible, but the burden is compliance, not capability, and the timeline is measured in quarters of legal work rather than sprints.</p>
+      <p><b>Problems needing exact answers.</b> Accounting, billing, anything reconciling to a cent. Use the model to fetch and format; use code to compute.</p>
+      <p><b>Real-time under tight latency.</b> Sub-100ms budgets rule out most model calls. Precompute or pick a different problem.</p>
+      <p><b>Tiny volume, high stakes.</b> If a human reviews every output anyway, you have automated the easy part of a job that was not the bottleneck.</p>
+      <p><b>"ChatGPT but for X" where X has no proprietary data, no workflow and no distribution.</b> You are reselling a commodity with a markup, against a vendor who can add your feature in a release.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="ladder">
+  <div class="prose">
+    <h2>The 0 to 1 ladder</h2>
+
+    <p>Climb in order. Each rung costs roughly ten times the one below it, and most products should stop at rung two or three. The most common and most expensive mistake in AI startups is starting three rungs too high.</p>
+
+    <p><b>Rung 0 — Wizard of Oz.</b> Humans do the work behind the interface. No model at all. You learn what users actually ask, what a good answer looks like, and whether anyone wants this — all of which you need before you can build anything. It costs days. Teams skip it because it feels like cheating, and then spend three months building the wrong thing.</p>
+
+    <p><b>Rung 1 — Prompting.</b> A good model, a well-structured prompt, few-shot examples, a schema on the output. Genuinely more capable than most people expect, and the fastest path to something real. Ship this and find out what breaks.</p>
+
+    <p><b>Rung 2 — Prompting plus retrieval.</b> Add your own knowledge. This is where most successful AI products live permanently. It handles the "the model does not know our stuff" problem, which is the actual problem in most business use cases. See <a href="rag.html">the RAG deep dive</a> for how to do it properly.</p>
+
+    <p><b>Rung 3 — Orchestration.</b> Multiple calls, routing, tools, verification steps, a human in the loop where it matters. More capability, more failure modes, more latency, more cost. Justified when a single call demonstrably cannot do the job — which you can only know because you tried.</p>
+
+    <p><b>Rung 4 — Fine-tuning.</b> When you need consistent behaviour, format or style that prompting cannot reliably produce, and you have the data to teach it. Real ongoing cost: data curation, a training pipeline, evaluation, and the obligation to redo it when the base model is deprecated.</p>
+
+    <p><b>Rung 5 — Training your own model.</b> Almost never correct for a startup. The exceptions are genuinely narrow: a domain where no general model has competence, or a cost structure at enormous scale where the amortised training cost beats per-call pricing. If you are considering this in your first two years, the burden of proof is high and should be met with numbers.</p>
+
+    <p>The discipline is to climb only when the rung below has demonstrably failed, measured on your evaluation set rather than on a feeling that the current approach is unsophisticated.</p>
+  </div>
+</section>
+
+<section class="section" id="decision">
+  <div class="prose">
+    <h2>Build, buy or fine-tune</h2>
+    <p>This decision gets made emotionally more often than analytically. The tree below is the analytical version.</p>
+  </div>
+
+  <figure class="fig">
+    <svg viewBox="0 0 880 480" role="img" aria-label="Decision tree for build, buy or fine-tune. Start by asking whether an off-the-shelf product already solves it, which leads to buying. If not, ask whether prompting alone is sufficient, which leads to shipping the prompt. If not, ask whether the gap is missing knowledge, which leads to retrieval, or missing behaviour, which leads to fine-tuning. Training a model from scratch is reached only when no general model has competence in the domain and you have both the data and the budget.">
+      <rect class="dg-box dg-box--accent" x="300" y="12" width="280" height="44"/>
+      <text class="dg-text" x="316" y="40">a task you want automated</text>
+
+      <path class="dg-line--accent" d="M440 56 V88"/><path class="dg-fill--accent" d="M436 82 l4 8 4 -8 z"/>
+
+      <rect class="dg-box" x="280" y="88" width="320" height="44"/>
+      <text class="dg-text" x="296" y="116">does a product already solve this well?</text>
+      <rect class="dg-box" x="640" y="88" width="180" height="44"/>
+      <text class="dg-text--accent" x="656" y="110">yes → buy it</text>
+      <text class="dg-text--dim" x="656" y="126">build is not the default</text>
+      <path class="dg-line" d="M600 110 H640"/><path class="dg-fill" d="M634 106 l8 4 -8 4 z"/>
+
+      <path class="dg-line--accent" d="M440 132 V164"/><path class="dg-fill--accent" d="M436 158 l4 8 4 -8 z"/>
+      <text class="dg-text--dim" x="448" y="152">no</text>
+
+      <rect class="dg-box" x="280" y="164" width="320" height="44"/>
+      <text class="dg-text" x="296" y="192">does a good prompt alone do it?</text>
+      <rect class="dg-box" x="640" y="164" width="180" height="44"/>
+      <text class="dg-text--accent" x="656" y="186">yes → ship it</text>
+      <text class="dg-text--dim" x="656" y="202">stop here. most do.</text>
+      <path class="dg-line" d="M600 186 H640"/><path class="dg-fill" d="M634 182 l8 4 -8 4 z"/>
+
+      <path class="dg-line--accent" d="M440 208 V240"/><path class="dg-fill--accent" d="M436 234 l4 8 4 -8 z"/>
+      <text class="dg-text--dim" x="448" y="228">no</text>
+
+      <rect class="dg-box" x="280" y="240" width="320" height="56"/>
+      <text class="dg-text" x="296" y="264">what is missing?</text>
+      <text class="dg-text--dim" x="296" y="284">read the errors, do not guess</text>
+
+      <path class="dg-line--accent" d="M340 296 V332"/><path class="dg-fill--accent" d="M336 326 l4 8 4 -8 z"/>
+      <path class="dg-line--accent" d="M540 296 V332"/><path class="dg-fill--accent" d="M536 326 l4 8 4 -8 z"/>
+
+      <rect class="dg-box dg-box--accent" x="180" y="332" width="240" height="56"/>
+      <text class="dg-text" x="196" y="356">knowledge → retrieval</text>
+      <text class="dg-text--dim" x="196" y="376">it does not know your facts</text>
+
+      <rect class="dg-box dg-box--accent" x="460" y="332" width="240" height="56"/>
+      <text class="dg-text" x="476" y="356">behaviour → fine-tune</text>
+      <text class="dg-text--dim" x="476" y="376">right content, wrong shape</text>
+
+      <path class="dg-line" d="M580 388 V420" stroke-dasharray="3 4"/><path class="dg-fill" d="M576 414 l4 8 4 -8 z"/>
+      <rect class="dg-box" x="400" y="420" width="400" height="48"/>
+      <text class="dg-text--dim" x="416" y="442">train from scratch only if no general model has</text>
+      <text class="dg-text--dim" x="416" y="458">competence here AND you have the data and budget</text>
+    </svg>
+    <figcaption>The branch people get wrong is the last one. Fine-tuning teaches form; retrieval supplies facts. Teams reach for fine-tuning to fix a knowledge gap, get a model that is confidently wrong in exactly the right tone, and conclude the technique does not work.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <p>Two rules that resolve most real cases.</p>
+
+    <p><b>Buy unless it is your differentiator.</b> If the capability is not what customers choose you for, buying it is almost always correct. Engineering time is your scarcest resource and rebuilding a commodity spends it on something no customer will ever notice.</p>
+
+    <p><b>Build where your data or workflow is the advantage.</b> If you have proprietary data, a proprietary process, or deep integration into how customers work, that is the part to build, because it is the part nobody else can copy.</p>
+  </div>
+</section>
+
+<section class="section" id="economics">
+  <div class="prose">
+    <h2>Unit economics</h2>
+
+    <p>AI features have a cost structure most software founders have never dealt with: <b>marginal cost per use that does not fall to zero with scale.</b> Traditional software gets cheaper per user as you grow. An LLM feature costs roughly the same on the millionth request as the first. If your pricing assumes software margins and your costs behave like a utility bill, growth makes the problem worse rather than better.</p>
+
+    <p>So work out the arithmetic before you launch, not after.</p>
+
+<pre><code><span class="c-com"># The model. Fill in your own numbers; the structure is what matters.</span>
+
+tokens_in   = system_prompt + retrieved_context + user_input
+tokens_out  = response_length
+
+cost_call   = (tokens_in  / 1e6) * price_in
+            + (tokens_out / 1e6) * price_out
+
+<span class="c-com"># Calls per outcome is the term everyone forgets.</span>
+calls       = <span class="c-num">1</span>                      <span class="c-com"># the happy path</span>
+            + retries                <span class="c-com"># failures you pay for twice</span>
+            + rerank_calls           <span class="c-com"># if reranking with an LLM</span>
+            + agent_steps            <span class="c-com"># multiplies everything</span>
+
+cost_outcome = cost_call * calls / success_rate
+
+<span class="c-com"># success_rate is the whole game. At 60% success you pay for
+# 1.67 attempts per useful result. Quality IS cost.</span>
+</code></pre>
+
+    <p>I am deliberately not printing provider prices. They change, and stale prices are worse than none. Put today's rates into that structure and you have a number you can defend.</p>
+
+    <h3>The three numbers to track</h3>
+
+    <p><b>Cost per successful outcome.</b> Not per request, not per token. A cheaper model with a lower success rate that triggers retries and escalations can be more expensive overall, and only this denominator shows it.</p>
+
+    <p><b>Cost as a percentage of revenue for that feature.</b> If a feature priced at $20 a month costs $14 to serve for a heavy user, you do not have a product, you have a subsidy. Find that out in month one.</p>
+
+    <p><b>The heavy-user tail.</b> Usage is always long-tailed. Model your 99th-percentile user, not your median. Flat-rate pricing plus unbounded AI usage plus one enthusiastic customer is a recognised way to lose money at scale.</p>
+
+    <h3>Levers, in order of return</h3>
+
+    <p><b>Route by difficulty.</b> Most requests do not need the largest model. Classify and send the easy majority somewhere cheaper, with your eval suite confirming quality holds. This is usually the single biggest win available and it is often a week of work.</p>
+
+    <p><b>Cache the static prefix.</b> A long system prompt re-sent on every request is billed every time unless cached. On a chat product this alone can be a substantial fraction of spend.</p>
+
+    <p><b>Cut context.</b> Retrieving ten chunks when five perform identically doubles input cost for nothing. Measure the recall curve rather than assuming more is safer.</p>
+
+    <p><b>Cap output.</b> Directly proportional savings, and shorter answers are often better product anyway.</p>
+
+    <p><b>Cache answers.</b> On support-style products a meaningful share of questions repeat verbatim.</p>
+
+    <p><b>Batch what is not interactive.</b> Asynchronous tiers are substantially cheaper and most background work has no latency requirement.</p>
+
+    <div class="callout callout--warn">
+      <span class="callout__label">pricing follows from this, not the other way round</span>
+      <p>If you cannot yet predict cost per outcome, usage-based or credit pricing protects you while you learn. Flat-rate unlimited pricing on a variable-cost feature is a bet that your heaviest users will be reasonable. Some founders take that bet deliberately for growth; taking it accidentally is how a good quarter becomes a bad one.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="evals">
+  <div class="prose">
+    <h2>Eval-first development</h2>
+
+    <p>This is the single highest-leverage practice in AI product work and the most commonly deferred, because it feels like infrastructure when you want to be shipping features.</p>
+
+    <p>The argument is simple. Without evaluation you cannot tell whether a change made things better. You will change a prompt, read three outputs, decide it seems better, ship it, and discover two weeks later that something else regressed. Multiply that across a team and you get a product that changes constantly and improves randomly.</p>
+
+    <p><b>What to build, minimally:</b> fifty real examples with a defined notion of a good response. Real ones, from users or from the humans currently doing this work — not examples you invented, which will be shaped like your assumptions. A script that runs them and produces a number. That number in CI.</p>
+
+    <p>Fifty examples and a script is a day of work. It changes the character of everything afterwards: you can refactor prompts without fear, compare models honestly, and answer "did that help?" with evidence.</p>
+
+    <p><b>Order of checks.</b> Start with what code can verify — schema validity, required fields, length, forbidden content, citation ids that actually exist. These are free and deterministic. Only use a model to judge the genuinely subjective remainder, and when you do, calibrate it against human labels and report the agreement. An uncalibrated judge produces confident numbers that mean nothing.</p>
+
+    <p><b>Include the cases that should fail.</b> Questions your system cannot answer, inputs that should be refused, adversarial content. A system that never abstains is not correct, it is untested.</p>
+
+    <p>For the full treatment, see <a href="articles/evaluation.html">evaluation engineering</a>.</p>
+  </div>
+</section>
+
+<section class="section" id="moats">
+  <div class="prose">
+    <h2>Moats, and what is not one</h2>
+
+    <div class="callout callout--kill">
+      <span class="callout__label">not a moat</span>
+      <p><b>Using a good model.</b> Your competitor calls the same endpoint. This is table stakes, like using a database.</p>
+      <p><b>Prompt engineering.</b> Prompts are copyable, discoverable, and obsolete when the model changes. Valuable, not defensible.</p>
+      <p><b>Being first.</b> In a field moving this fast, a six-month lead on a feature is a lead on a feature, not on a business.</p>
+      <p><b>A fine-tuned model on public data.</b> Anyone can fine-tune on the same public data, usually more cheaply next year.</p>
+      <p><b>A thin wrapper over an API.</b> If the model vendor can ship your product as a feature, they eventually might.</p>
+    </div>
+
+    <p>What actually defends a business is mostly what defended businesses before, with one addition.</p>
+
+    <p><b>Proprietary data that compounds.</b> Not just data you have — data that accumulates from usage and makes the product better in a way competitors cannot replicate without the same usage. The test: does your product get measurably better for every user as more people use it? If yes, you have a flywheel. If your data is a static corpus you licensed, it is an asset, not a moat.</p>
+
+    <p><b>Workflow depth.</b> When you are the system of record, when you hold the integrations, when switching means retraining a team and migrating history — that is expensive to leave. Deep, unglamorous integration into how customers actually work is the most reliable moat available to an application company, and it is mostly not an AI problem at all.</p>
+
+    <p><b>Distribution.</b> Owning the channel, the relationship, or the regulatory approval. Frequently decisive and frequently dismissed by technical founders as not real engineering.</p>
+
+    <p><b>Evaluation and domain knowledge.</b> An underrated one. Knowing precisely what good looks like in a specialised domain — having built the golden set, learned the edge cases, encoded the expert judgement — is genuinely hard to copy, because it came from work rather than from a model.</p>
+
+    <p><b>Trust and brand in a high-stakes domain.</b> In medicine, law or finance, being the one people trust is a moat that takes years to build and cannot be bought with a better model.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the useful stress test</span>
+      <p>If the best model in the world became free tomorrow, what would still be hard about building your product? Whatever is left is your actual business. If the honest answer is "nothing," that is important information and it is better to have it now.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="team">
+  <div class="prose">
+    <h2>Who to hire, and when</h2>
+
+    <p>The most common early hiring mistake is hiring a research profile for a product problem.</p>
+
+    <p><b>Pre-product-market-fit.</b> You need product engineers who can call an API and iterate fast, not ML specialists. At this stage the hard problems are what to build and whether anyone wants it, and those are not model problems. A strong generalist who is comfortable with ambiguity will outperform a researcher here.</p>
+
+    <p><b>Early product, real users.</b> Now hire your first dedicated AI engineer — someone who has shipped LLM features to production, not someone who has trained models. The skills you need are evaluation, retrieval, prompt discipline, cost control and observability. Ask them about a system that failed in production and listen for whether they can name the diagnostic they used.</p>
+
+    <p><b>Scaling.</b> Add infrastructure and data engineering, usually before you add more modelling. The constraint at this stage is almost always pipeline reliability and iteration speed, not model quality.</p>
+
+    <p><b>A research hire</b> makes sense when you have a genuinely novel problem, data nobody else has, and the runway for a project measured in quarters with uncertain output. Before that, a researcher will be frustrated and you will be paying a premium for skills the job does not use.</p>
+
+    <p><b>The role people forget:</b> someone who owns the domain and the evaluation set. Often not an engineer — a domain expert who can say definitively what a good output looks like and maintain the golden set. On specialised products this person is frequently the difference between a system that works and one that does not, and they are almost never in the original plan.</p>
+  </div>
+</section>
+
+<section class="section" id="failures">
+  <div class="prose">
+    <h2>How AI startups fail</h2>
+
+    <p><b>The demo-to-production gap.</b> The demo worked because you tried it on examples you chose. Production traffic contains the malformed, the ambiguous, the adversarial and the very long. A system at 90% on curated examples is often at 60% on reality, and the last stretch costs more than everything before it. Get real traffic in front of it early, even at small volume, precisely so this arrives as a surprise in week three rather than month six.</p>
+
+    <p><b>Eval debt.</b> Skipping evaluation to move fast, then reaching a point where nobody can change anything confidently. It compounds exactly like technical debt and is harder to pay down, because building an evaluation set retroactively means labelling history you no longer remember.</p>
+
+    <p><b>Prompt spaghetti.</b> Prompts scattered through the codebase, edited by anyone, versioned by nobody, with no tests. A production dependency nobody controls. Treat prompts as code from day one: version them, review them, test them.</p>
+
+    <p><b>The 80% wall.</b> Getting to 80% is fast and feels like progress. Every point after that is exponentially harder, and many use cases need 95% to be useful at all. Ask early what accuracy makes this valuable, and be honest about whether the gap between there and 80% is a sprint or a company.</p>
+
+    <p><b>Building for the model instead of the user.</b> Shipping a chat box because the technology is conversational, when the user wanted a button. The model is an implementation detail; a great many AI features would be better products with no visible AI in them at all.</p>
+
+    <p><b>Ignoring latency.</b> A correct answer in fourteen seconds loses to a decent answer in one. Streaming helps because it changes perceived latency, but an architecture with five sequential model calls has a floor you cannot stream past.</p>
+
+    <p><b>Unbounded scope.</b> "It handles anything" means it is mediocre at everything and you cannot evaluate it. Narrow, excellent and evaluable beats broad and unreliable, especially early, when what you need most is one group of users who genuinely depend on you.</p>
+
+    <p><b>Not planning for model deprecation.</b> The model you launched on will be deprecated. If you have no evaluation suite, migrating is a leap of faith; with one it is an afternoon. This alone justifies the eval work.</p>
+  </div>
+</section>
+
+<section class="section" id="risk">
+  <div class="prose">
+    <h2>Privacy, vendors and risk</h2>
+
+    <p><b>Know where the data goes.</b> Before sending customer data to any provider, know the retention policy, whether inputs may be used for training, where processing happens geographically, and what the enterprise terms change. These differ by provider and by tier, and enterprise agreements typically offer no-training and zero-retention options that consumer tiers do not.</p>
+
+    <p><b>Your customers will ask.</b> In B2B, a security questionnaire asking which subprocessors see customer data is routine, and "we send it to a model API" needs to be an answer you have prepared with a data processing agreement behind it, not a conversation you have for the first time during a deal.</p>
+
+    <p><b>Minimise before sending.</b> Redact what the model does not need. Pseudonymise identifiers. The cheapest way to protect data is not to transmit it.</p>
+
+    <p><b>Data residency</b> is a real constraint in the EU and increasingly elsewhere. Check regional processing options before promising anything.</p>
+
+    <p><b>Injection is a product risk, not just a security one.</b> If you process user-supplied or retrieved content, that content can attempt to instruct your model. The dangerous combination is untrusted content plus tools plus actions with side effects. Keep those separated and never let retrieved text reach a tool-calling path unexamined.</p>
+
+    <p><b>Vendor concentration.</b> Single-provider dependency is a real risk — pricing changes, deprecations, rate limits, outages, policy changes that make your use case non-compliant. You do not need multi-provider on day one, but you should keep the model behind an interface so switching is an afternoon rather than a rewrite. And your evaluation suite is what makes a switch decidable.</p>
+
+    <p><b>Be careful what you claim.</b> Marketing copy asserting accuracy or capability can become a contractual and regulatory commitment. Claims about automated decision-making in particular carry obligations in several jurisdictions. Say what it does; avoid saying it is always right.</p>
+  </div>
+</section>
+
+<section class="section" id="plan">
+  <div class="prose">
+    <h2>A 90-day plan</h2>
+
+    <p>For a team adding AI to an existing product, or building an AI product from zero. Adjust the dates; keep the order, because each phase depends on the last.</p>
+
+    <h3>Days 1–14 — Decide what you are building</h3>
+    <p>Pick one narrow use case with a measurable current cost. Interview five people who do that work now, and collect fifty real examples of inputs and good outputs while you do. Run a Wizard of Oz version if you can. Write down what accuracy would make this genuinely useful — that number governs everything downstream. Decide explicitly against the alternatives you considered.</p>
+
+    <h3>Days 15–30 — Build the ruler before the thing</h3>
+    <p>Turn the fifty examples into an evaluation set with a defined notion of a good response. Write the programmatic checks. Build the simplest possible version — prompt only — and measure it. You now have a baseline, and often a surprise: the simple version is frequently closer than expected.</p>
+
+    <h3>Days 31–60 — Get it to useful</h3>
+    <p>Work the errors rather than the architecture. Read fifty failures and categorise them; the distribution tells you what to fix, and it is rarely what you assumed. Add retrieval only if the errors are knowledge errors. Add orchestration only if a single call demonstrably cannot do it. Measure after each change. Put it in front of ten real users under supervision.</p>
+
+    <h3>Days 61–90 — Make it a product</h3>
+    <p>Instrument cost per successful outcome. Add tracing so any request can be reconstructed. Put the eval suite in CI. Define the failure path — what the user sees when the system cannot answer, and how they escalate. Write the runbook. Ship to a wider group and watch the implicit quality signals, especially rephrase-after-answer.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the one-paragraph version</span>
+      <p>Pick something narrow where being wrong is cheap. Collect fifty real examples before writing code. Build the evaluation set before the feature. Start with a prompt and climb only when you have evidence you must. Measure cost per successful outcome from the first week. Treat prompts as code. And be honest with yourself about what would still be hard if the best model were free — because that is the only part that is actually your company.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, and there is nothing to buy.</b> This is a gift to my subscribers on X.</p>
+    <p>If it saved you a bad quarter, pass it to a founder who is about to have one — and follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> on X.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="rag.html">RAG, properly</a></span><span class="sep">|</span><span class="v"><a href="articles/evaluation.html">evaluation engineering</a></span><span class="sep">|</span><span class="v"><a href="articles/finetuning.html">fine-tuning decisions</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
+</div>
+</main>

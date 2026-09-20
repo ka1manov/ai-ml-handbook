@@ -1,0 +1,658 @@
+path: index.html
+title: The AI/ML Engineering Handbook
+ogtitle: The AI/ML Engineering Handbook
+desc: A staged roadmap, a RAG deep dive, 120+ interview questions and a startup playbook — for people who ship machine learning systems, not notebooks. Free, no signup.
+og: og-default.png
+scripts: progress
+---
+<main id="main">
+<div class="shell">
+
+<section class="win" style="margin-top:var(--sp-6)">
+  <div class="win__bar">
+    <span class="win__dots">[_][□][X]</span>
+    <span class="win__title">ka1manov@handbook: ~/ai-ml-handbook</span>
+  </div>
+  <div class="win__body">
+    <p class="prompt">python -m handbook --serve --free</p>
+    <div class="log" aria-label="Contents">
+      <div class="log__row"><span class="log__t">[00:00:00]</span><span class="log__lvl">init</span><span class="log__msg">loading curriculum … 7 stages, 42 nodes</span></div>
+      <div class="log__row"><span class="log__t">[00:00:00]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-00">stage 00 · foundations</a> — the maths and engineering you actually use</span></div>
+      <div class="log__row"><span class="log__t">[00:00:00]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-01">stage 01 · classical ml</a> — the baselines you must beat</span></div>
+      <div class="log__row"><span class="log__t">[00:00:00]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-02">stage 02 · deep learning</a> — training loops that converge</span></div>
+      <div class="log__row"><span class="log__t">[00:00:01]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-03">stage 03 · transformers &amp; llms</a> — attention to alignment</span></div>
+      <div class="log__row"><span class="log__t">[00:00:01]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-04">stage 04 · applied llm systems</a> — rag, agents, fine-tuning</span></div>
+      <div class="log__row"><span class="log__t">[00:00:01]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-05">stage 05 · production &amp; llmops</a> — serving, eval, cost, observability</span></div>
+      <div class="log__row"><span class="log__t">[00:00:01]</span><span class="log__lvl log__lvl--ok">ok</span><span class="log__msg"><a href="#stage-06">stage 06 · specialisation</a> — pick a depth and go</span></div>
+      <div class="log__row"><span class="log__t">[00:00:01]</span><span class="log__lvl">also</span><span class="log__msg"><a href="rag.html">rag deep dive</a>, <a href="interview.html">120+ interview questions</a>, <a href="startups.html">startup playbook</a>, <a href="tips.html">50 field notes</a>, <a href="articles/index.html">6 long reads</a></span></div>
+      <div class="log__row"><span class="log__t">[00:00:02]</span><span class="log__lvl log__lvl--ok">ready</span><span class="log__msg">serving on this page<span class="cursor" aria-hidden="true"></span></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="pagehead" style="border-bottom:0">
+  <h1>Everything I wish someone had handed me before my first ML system went to production.</h1>
+  <p class="lede">A staged roadmap you can actually check off, a RAG deep dive that covers the failure modes nobody writes about, 120+ interview questions with real answers, and a playbook for founders deciding what to build. Written for engineers who ship, not for people collecting certificates.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~30k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~2h</span><span class="sep">|</span><span class="k">price</span> <span class="v">free, forever</span><span class="sep">|</span><span class="k">signup</span> <span class="v">none</span><span class="sep">|</span><span class="k">tracking</span> <span class="v">none</span></p>
+</section>
+
+<section class="section" id="how-to-use">
+  <div class="prose">
+    <h2>Read this first</h2>
+    <p>This is a gift to my subscribers on X. There is nothing to buy, no email to hand over, and no analytics script watching you. Take it, fork it, print it, teach from it.</p>
+
+    <p>Three things make it different from the roadmap graphics you have already seen:</p>
+
+    <p><b>Every node has a "prove it."</b> Not "learn backpropagation" — <i>implement backpropagation for a two-layer network in NumPy and match PyTorch's gradients to 1e-6</i>. An artifact you either have or do not have. Reading about a concept and being able to use it under pressure are different skills, and only one of them survives an interview or an outage.</p>
+
+    <p><b>Every node says what it prevents.</b> Techniques are not interesting in themselves. They are interesting because of the specific way things break without them. Where I know the failure, I name it.</p>
+
+    <p><b>The time estimates are honest.</b> They assume you have a job and study around it. If a number looks large, that is the number, not a motivational one.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">how to use the roadmap</span>
+      <p>Do not start at stage 00 unless you are genuinely starting. Scan the "prove it" line of every node instead. Anything you could not produce this afternoon is a gap, wherever it sits in the sequence. Work the gaps, not the order. Your ticks are saved in this browser only.</p>
+    </div>
+
+    <h2>Who this is for</h2>
+    <p><b>The engineer levelling up.</b> You can train a model in a notebook and you want the map to a system that stays up. Stages 02 through 05 are yours; skim 00 and 01 for gaps.</p>
+    <p><b>The candidate.</b> You have a loop in two weeks. Go straight to the <a href="interview.html">question bank</a>, then read <a href="rag.html">RAG</a> and <a href="articles/evaluation.html">evaluation</a> properly, because that is where senior interviews actually separate people.</p>
+    <p><b>The founder or CTO.</b> Start with the <a href="startups.html">startup playbook</a>. It has the cost arithmetic and the build-versus-buy tree. Come back to the roadmap when you are hiring and need to know what to test for.</p>
+
+    <div class="callout callout--kill">
+      <span class="callout__label">who this is not for</span>
+      <p>If you want to understand the mathematics of machine learning deeply, read Bishop, Murphy or Goodfellow instead. This handbook is about building systems that work, which is a related but genuinely different discipline. It will not make you a researcher, and it does not pretend to.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="roadmap">
+  <div class="prose">
+    <h2 style="margin-top:0;border-top:0;padding-top:0">The roadmap</h2>
+    <p>Seven stages, 42 nodes. Tick what you can already prove.</p>
+  </div>
+
+  <div class="progress-dash" style="margin-top:var(--sp-5)">
+    <span>progress</span>
+    <span class="progress-dash__track"><span class="progress-dash__fill"></span></span>
+    <span data-progress-dash>0/42</span>
+    <button class="btn" type="button" data-progress-reset>[ reset ]</button>
+  </div>
+
+  <!-- ===================== STAGE 00 ===================== -->
+  <section class="stage" id="stage-00">
+    <div class="stage__head">
+      <span class="stage__num">[00]</span>
+      <h2 class="stage__title">Foundations</h2>
+      <p class="stage__sub">The maths and engineering you actually reach for. Skip what you can already prove — nobody is marking your attendance.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s0-n1">
+        <div class="node__body">
+          <h3><label for="s0-n1">Linear algebra, restricted to what you use</label></h3>
+          <p>Matrix multiplication and its shapes, dot products as similarity, matrix–vector products as linear maps, eigenvectors, SVD, and rank. Not a semester course — the working subset.</p>
+          <p class="node__why"><b>Why it matters:</b> almost every real bug in a training script is a shape bug. Engineers who cannot hold <code>[batch, seq, d_model]</code> in their head debug by permuting dimensions at random until the error goes away, which produces code that runs and is silently wrong.</p>
+          <p class="node__prove"><b>Prove it:</b> derive the output shape of batched multi-head attention by hand, on paper, from <code>[B, S, D]</code> through heads and back, then verify against a real forward pass. Separately, reconstruct a matrix from its top-k SVD components and plot reconstruction error against k.</p>
+          <p class="node__time">~15–25h · assumes secondary-school algebra</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s0-n2">
+        <div class="node__body">
+          <h3><label for="s0-n2">Probability and statistics for decisions</label></h3>
+          <p>Distributions, expectation and variance, conditional probability and Bayes, maximum likelihood, sampling, confidence intervals, and hypothesis tests.</p>
+          <p class="node__why"><b>Why it matters:</b> this is the difference between "the new model scored 91.2% versus 90.8%, ship it" and asking whether that gap survives the test set's sampling noise. Most shipped regressions I have seen were approved on differences that were inside the error bars.</p>
+          <p class="node__prove"><b>Prove it:</b> take any two model variants, compute a bootstrap confidence interval on their metric difference over your test set, and state the minimum test-set size that would make a 0.4-point difference detectable. If you cannot do this, you cannot responsibly approve a model change.</p>
+          <p class="node__time">~25–40h · the highest-leverage stage-00 node</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s0-n3">
+        <div class="node__body">
+          <h3><label for="s0-n3">Calculus to the depth backprop needs</label></h3>
+          <p>Derivatives, partial derivatives, gradients, the chain rule, and the Jacobian. Stop there. You do not need contour integration.</p>
+          <p class="node__why"><b>Why it matters:</b> exploding and vanishing gradients, dead ReLUs, and why residual connections exist are all chain-rule facts. Without this you cannot read a loss curve; you can only react to it.</p>
+          <p class="node__prove"><b>Prove it:</b> write the gradient of cross-entropy with respect to the logits by hand and explain, in one sentence, why the softmax and the loss are fused in every serious implementation.</p>
+          <p class="node__time">~12–20h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s0-n4">
+        <div class="node__body">
+          <h3><label for="s0-n4">Python that survives code review</label></h3>
+          <p>Type hints, dataclasses, context managers, generators, virtual environments and dependency pinning, <code>pytest</code>, and a debugger you can actually drive.</p>
+          <p class="node__why"><b>Why it matters:</b> the gap between a data scientist and an ML engineer is mostly here. Notebook code that trains a good model and cannot be run by anyone else has produced nothing of value to the company.</p>
+          <p class="node__prove"><b>Prove it:</b> take your worst notebook and turn it into an installable package with a CLI, pinned dependencies, and tests that run in CI. A colleague clones it and reproduces your number without asking you a single question.</p>
+          <p class="node__time">~20–30h · pays back faster than anything else here</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s0-n5">
+        <div class="node__body">
+          <h3><label for="s0-n5">Data manipulation that does not fall over</label></h3>
+          <p>SQL to window functions and CTEs, pandas or Polars fluency, vectorisation over loops, columnar formats such as Parquet, and out-of-core processing.</p>
+          <p class="node__why"><b>Why it matters:</b> you will spend more time on data than on models, and the difference between a query that runs in 4 seconds and 40 minutes decides how many experiments you get to run this week. Iteration speed is the real constraint on model quality.</p>
+          <p class="node__prove"><b>Prove it:</b> write a single SQL query with a window function that produces a point-in-time-correct training label — one that uses only information available at prediction time. Getting this wrong is the most common source of leakage in industry.</p>
+          <p class="node__time">~25–40h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s0-n6">
+        <div class="node__body">
+          <h3><label for="s0-n6">Software engineering fundamentals</label></h3>
+          <p>Git beyond <code>commit</code> and <code>push</code>, code review, Docker, CI, logging and structured observability, and enough Linux and networking to debug a container that will not start.</p>
+          <p class="node__why"><b>Why it matters:</b> ML systems fail as software far more often than they fail as mathematics. The 3am page is a CUDA version mismatch, a full disk, or an OOM — not a subtle optimisation failure.</p>
+          <p class="node__prove"><b>Prove it:</b> containerise a training job so it runs identically on your laptop and on a GPU host, with dependencies pinned to exact versions, and produces a reproducible metric given a fixed seed.</p>
+          <p class="node__time">~30–50h · the most under-invested node on this page</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===================== STAGE 01 ===================== -->
+  <section class="stage" id="stage-01">
+    <div class="stage__head">
+      <span class="stage__num">[01]</span>
+      <h2 class="stage__title">Classical machine learning</h2>
+      <p class="stage__sub">Skipping this to get to transformers is the single most common mistake I see. These are the baselines you have to beat, and on tabular data you often will not.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s1-n1">
+        <div class="node__body">
+          <h3><label for="s1-n1">The supervised learning contract</label></h3>
+          <p>What a model is actually promising: that training and deployment data are drawn from the same distribution. Bias and variance, over- and underfitting, and the assumptions that break in production.</p>
+          <p class="node__why"><b>Why it matters:</b> every production ML failure that is not a plumbing failure is this contract being violated. Distribution shift is not an exotic edge case; it is the default state of the world, and your model is the only party that does not know it.</p>
+          <p class="node__prove"><b>Prove it:</b> name the three assumptions your current production model makes about its input distribution, and the monitor that would tell you when each one breaks. If you cannot name the monitors, you do not have them.</p>
+          <p class="node__time">~8–12h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s1-n2">
+        <div class="node__body">
+          <h3><label for="s1-n2">Splitting, validation and leakage</label></h3>
+          <p>Train/validation/test discipline, k-fold and stratified cross-validation, grouped splits, time-based splits, and the many faces of leakage.</p>
+          <p class="node__why"><b>Why it matters:</b> leakage is the defect that punishes you hardest and latest. An offline AUC of 0.95 that collapses to 0.62 in production has cost a quarter, and the cause is nearly always a feature computed with information that would not exist at prediction time.</p>
+          <p class="node__prove"><b>Prove it:</b> deliberately introduce target leakage into a dataset, observe the inflated validation score, then build the split that catches it. Write down the three leakage checks you will run before believing any offline number again.</p>
+          <p class="node__time">~12–18h · the node that saves careers</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s1-n3">
+        <div class="node__body">
+          <h3><label for="s1-n3">Linear and logistic regression as baselines</label></h3>
+          <p>Ordinary least squares, regularisation and what L1 and L2 actually do to coefficients, the logistic link, and reading a coefficient honestly.</p>
+          <p class="node__why"><b>Why it matters:</b> a regularised linear model is interpretable, trains in seconds, costs nothing to serve, and is frequently within a couple of points of the deep model that took a month. It is also the baseline that makes your gradient boosting result meaningful — without it, "0.87 AUC" is a number with no denominator.</p>
+          <p class="node__prove"><b>Prove it:</b> on a real problem of yours, get a regularised linear baseline to within five points of your best model, and be able to say precisely what the remaining gap is buying and whether it is worth the serving cost.</p>
+          <p class="node__time">~12–20h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s1-n4">
+        <div class="node__body">
+          <h3><label for="s1-n4">Trees, forests and gradient boosting</label></h3>
+          <p>Decision trees, bagging and random forests, gradient boosting, and the practical differences between XGBoost, LightGBM and CatBoost — especially their categorical handling and missing-value semantics.</p>
+          <p class="node__why"><b>Why it matters:</b> on tabular data, gradient-boosted trees remain the thing to beat, and a large body of comparative work continues to find they are competitive with or better than deep tabular models at a fraction of the cost. If your tabular problem is being solved with a neural network, you should be able to defend that choice with a measured comparison.</p>
+          <p class="node__prove"><b>Prove it:</b> tune a GBDT properly — learning rate against number of trees, depth, and the sampling parameters — and explain what each parameter trades. Then explain why raising the learning rate usually requires fewer trees and what that does to variance.</p>
+          <p class="node__time">~20–30h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s1-n5">
+        <div class="node__body">
+          <h3><label for="s1-n5">Feature engineering and encoding</label></h3>
+          <p>Categorical encoding and its traps, target encoding done without leaking, scaling, binning, interactions, and handling missingness as signal rather than noise.</p>
+          <p class="node__why"><b>Why it matters:</b> on most tabular problems, features move the metric more than model choice does. Target encoding in particular leaks quietly unless it is fit inside the cross-validation fold, and that bug produces a beautiful offline number and a flat A/B test.</p>
+          <p class="node__prove"><b>Prove it:</b> implement out-of-fold target encoding yourself and demonstrate the score difference against the naive version fit on the full training set. The gap is your leakage.</p>
+          <p class="node__time">~15–25h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s1-n6">
+        <div class="node__body">
+          <h3><label for="s1-n6">Metrics, and what each one hides</label></h3>
+          <p>Accuracy, precision and recall, F1, ROC-AUC against PR-AUC, log loss, calibration, and regression metrics. Threshold selection as a business decision rather than a default of 0.5.</p>
+          <p class="node__why"><b>Why it matters:</b> ROC-AUC is misleading under heavy class imbalance because the false-positive rate barely moves when negatives dominate; PR-AUC shows the problem plainly. And a model can rank perfectly while being badly calibrated, which breaks you the moment a downstream system treats the score as a probability — expected-value calculations, budget pacing and risk thresholds all do.</p>
+          <p class="node__prove"><b>Prove it:</b> take an imbalanced problem, show a case where ROC-AUC looks strong and PR-AUC does not, then produce a reliability diagram and fix the calibration with Platt scaling or isotonic regression.</p>
+          <p class="node__time">~15–20h</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===================== STAGE 02 ===================== -->
+  <section class="stage" id="stage-02">
+    <div class="stage__head">
+      <span class="stage__num">[02]</span>
+      <h2 class="stage__title">Deep learning</h2>
+      <p class="stage__sub">Where most self-taught engineers stall: they can call <code>.fit()</code> but cannot diagnose a loss curve that flattens at the wrong value.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s2-n1">
+        <div class="node__body">
+          <h3><label for="s2-n1">Backpropagation, implemented not recited</label></h3>
+          <p>The computational graph, forward and backward passes, automatic differentiation, and why gradients vanish or explode through depth.</p>
+          <p class="node__why"><b>Why it matters:</b> when a model will not train, the useful question is where the gradient dies. Engineers who have only ever called <code>loss.backward()</code> cannot form that question, so they change the learning rate and hope.</p>
+          <p class="node__prove"><b>Prove it:</b> implement a two-layer MLP with backprop in NumPy — forward, backward, update, no autograd — and match PyTorch's gradients to 1e-6 on the same weights and inputs.</p>
+          <p class="node__time">~20–30h · do this once and you will never forget it</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s2-n2">
+        <div class="node__body">
+          <h3><label for="s2-n2">Optimisers and learning-rate schedules</label></h3>
+          <p>SGD with momentum, Adam and AdamW, weight decay done correctly, warmup, cosine decay, and gradient clipping.</p>
+          <p class="node__why"><b>Why it matters:</b> learning rate is the hyperparameter that matters most and the one people tune least carefully. The AdamW distinction is not pedantry: in plain Adam, L2 regularisation added to the loss gets scaled by the adaptive per-parameter denominator, so parameters with large gradient history are effectively regularised less. Decoupling it changes results measurably.</p>
+          <p class="node__prove"><b>Prove it:</b> run the same model with Adam and AdamW at identical weight decay and show the difference in final validation loss. Then produce a learning-rate range test and explain how you would pick the maximum rate from it.</p>
+          <p class="node__time">~15–25h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s2-n3">
+        <div class="node__body">
+          <h3><label for="s2-n3">Regularisation and normalisation</label></h3>
+          <p>Dropout, weight decay, early stopping, data augmentation, and the normalisation layers — batch, layer and RMS — with the reasons transformers settled on layer-style normalisation.</p>
+          <p class="node__why"><b>Why it matters:</b> batch normalisation couples every example in a batch to every other, which is fine for vision with large batches and actively harmful for variable-length sequences and small batches. It also behaves differently in training and inference, which is a classic source of train/serve skew that only shows up after deployment.</p>
+          <p class="node__prove"><b>Prove it:</b> take a model using batch norm, run it at batch size 2, and explain the degradation. Then state precisely what batch norm does differently at inference time and why that creates skew risk.</p>
+          <p class="node__time">~12–20h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s2-n4">
+        <div class="node__body">
+          <h3><label for="s2-n4">Training-loop engineering</label></h3>
+          <p>Mixed precision, gradient accumulation, checkpointing and resumption, deterministic seeding, distributed data parallel, and profiling to find whether you are compute-, memory- or input-bound.</p>
+          <p class="node__why"><b>Why it matters:</b> a training run that cannot resume from a checkpoint will eventually lose you a week to a pre-emption. And a surprising share of GPU fleets are input-bound — the accelerator idles waiting on the data loader — which is invisible unless you profile and enormously expensive if you do not.</p>
+          <p class="node__prove"><b>Prove it:</b> profile a training job and state, with evidence, whether it is compute-, memory-bandwidth- or input-bound. Then make it 1.5× faster and explain which bottleneck you moved.</p>
+          <p class="node__time">~25–40h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s2-n5">
+        <div class="node__body">
+          <h3><label for="s2-n5">Convolutional networks and what convolution buys</label></h3>
+          <p>Convolution, pooling, receptive fields, residual connections, and the inductive biases — locality and translation equivariance — that make CNNs sample-efficient on images.</p>
+          <p class="node__why"><b>Why it matters:</b> even in a world of vision transformers, the architecture-as-prior lesson is the transferable one: ViTs need far more data or heavy augmentation to match CNNs on small datasets precisely because they lack that built-in bias. Knowing when a prior helps and when it constrains you is the actual skill.</p>
+          <p class="node__prove"><b>Prove it:</b> compute the receptive field of a stack of convolutions by hand, then explain why a residual connection makes a 50-layer network trainable when a plain stack of the same depth is not.</p>
+          <p class="node__time">~20–30h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s2-n6">
+        <div class="node__body">
+          <h3><label for="s2-n6">Debugging a model that will not learn</label></h3>
+          <p>A systematic procedure: overfit a single batch, check the initial loss against its theoretical value, inspect gradient norms per layer, visualise inputs after every transform, and remove pieces until it works.</p>
+          <p class="node__why"><b>Why it matters:</b> this is the single most valuable practical skill in deep learning and almost nobody teaches it explicitly. If your ten-class classifier does not start at a loss near ln(10) ≈ 2.303, something is wrong before training has even begun, and knowing that saves you days.</p>
+          <p class="node__prove"><b>Prove it:</b> write your own debugging checklist, in order, with the expected value at each step. Then use it to find a bug you have deliberately planted in a training script — a wrong axis in a loss, a label shuffle, a transform applied twice.</p>
+          <p class="node__time">~15–25h · pure compounding return</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===================== STAGE 03 ===================== -->
+  <section class="stage" id="stage-03">
+    <div class="stage__head">
+      <span class="stage__num">[03]</span>
+      <h2 class="stage__title">Transformers and large language models</h2>
+      <p class="stage__sub">The architecture is genuinely simple. The engineering around it is not, and that is where the questions get asked.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s3-n1">
+        <div class="node__body">
+          <h3><label for="s3-n1">Attention from first principles</label></h3>
+          <p>Queries, keys and values, scaled dot-product attention, multi-head attention, causal masking, and the quadratic cost in sequence length.</p>
+          <p class="node__why"><b>Why it matters:</b> the quadratic term is not trivia — it is the reason long context is expensive, the reason KV caching exists, and the reason a dozen approximate-attention schemes were invented. The scaling by √d<sub>k</sub> exists because dot products of high-dimensional vectors grow with dimension, pushing softmax into saturation where gradients vanish.</p>
+          <p class="node__prove"><b>Prove it:</b> implement multi-head attention in NumPy including the causal mask, and match a reference implementation. Then explain, with the arithmetic, why doubling context length roughly quadruples attention cost but only doubles the feed-forward cost.</p>
+          <p class="node__time">~20–30h · <a href="articles/transformers.html">full walkthrough here</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s3-n2">
+        <div class="node__body">
+          <h3><label for="s3-n2">The transformer block, end to end</label></h3>
+          <p>Embeddings, positional information from absolute encodings through to RoPE, the attention sublayer, the feed-forward sublayer, residual connections, and pre- versus post-normalisation.</p>
+          <p class="node__why"><b>Why it matters:</b> pre-normalisation is what made very deep transformers trainable without delicate warmup schedules, because it keeps a clean residual path for gradients. Rotary embeddings matter because they encode <i>relative</i> position, which is what actually generalises when you extend context beyond what you trained on.</p>
+          <p class="node__prove"><b>Prove it:</b> draw the block from memory with every tensor shape annotated, then state where in the block the parameters actually live and what fraction of them sit in the feed-forward sublayer.</p>
+          <p class="node__time">~15–25h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s3-n3">
+        <div class="node__body">
+          <h3><label for="s3-n3">Tokenisation, and why it breaks things</label></h3>
+          <p>Byte-pair encoding, WordPiece, SentencePiece, byte-level fallbacks, vocabulary size trade-offs, and special tokens.</p>
+          <p class="node__why"><b>Why it matters:</b> a startling share of "the model is stupid" reports are tokenisation artefacts. Character-level tasks, arithmetic on long numbers, and non-Latin scripts all degrade because of how text was split, not because of reasoning. Non-English text also tends to consume more tokens per unit of meaning, which is a direct and often unnoticed cost multiplier.</p>
+          <p class="node__prove"><b>Prove it:</b> tokenise the same paragraph in English and in a non-Latin-script language and compare the token counts. Then construct a prompt that fails purely because of tokenisation and explain the mechanism.</p>
+          <p class="node__time">~10–15h · badly underrated</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s3-n4">
+        <div class="node__body">
+          <h3><label for="s3-n4">Pretraining objectives and scaling behaviour</label></h3>
+          <p>Next-token prediction, masked language modelling, the compute–parameters–data relationship, and why the field moved toward training smaller models on substantially more data.</p>
+          <p class="node__why"><b>Why it matters:</b> scaling results tell you where to spend a fixed budget, and the compute-optimal answer is usually not "the largest model you can afford." Inference cost scales with parameters for the entire life of the deployment, so a smaller model trained longer is often the better economic choice even when both reach the same quality.</p>
+          <p class="node__prove"><b>Prove it:</b> given a fixed training budget, argue for a specific model size and token count and defend it on total cost of ownership rather than benchmark score alone.</p>
+          <p class="node__time">~12–20h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s3-n5">
+        <div class="node__body">
+          <h3><label for="s3-n5">Decoding and sampling</label></h3>
+          <p>Greedy decoding, beam search, temperature, top-k, nucleus sampling, repetition penalties, and constrained or grammar-guided decoding.</p>
+          <p class="node__why"><b>Why it matters:</b> sampling parameters change output quality as much as prompt wording, and teams routinely ship a default temperature they never examined. Beam search helps translation and hurts open-ended generation, where it produces bland, repetitive text — the objective it optimises is not the one you want.</p>
+          <p class="node__prove"><b>Prove it:</b> hold a prompt fixed and sweep temperature and top-p, then state the setting you would ship for an extraction task and for a creative task, with the reason for each. Then explain why temperature 0 is not strictly deterministic in a batched serving environment.</p>
+          <p class="node__time">~10–15h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s3-n6">
+        <div class="node__body">
+          <h3><label for="s3-n6">Alignment: SFT, RLHF and DPO</label></h3>
+          <p>Supervised fine-tuning, reward modelling, PPO-style RLHF, direct preference optimisation, and the alignment tax.</p>
+          <p class="node__why"><b>Why it matters:</b> this is why a base model and a chat model behave so differently, and why a fine-tune can improve your task while degrading instruction-following. DPO matters practically because it removes the separate reward model and the reinforcement-learning loop, which is most of the operational difficulty.</p>
+          <p class="node__prove"><b>Prove it:</b> explain the difference between a base and an instruction-tuned model to a non-specialist in three sentences, then state what DPO removes from the RLHF pipeline and what you give up for that simplicity.</p>
+          <p class="node__time">~15–25h · <a href="articles/finetuning.html">decision guide here</a></p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===================== STAGE 04 ===================== -->
+  <section class="stage" id="stage-04">
+    <div class="stage__head">
+      <span class="stage__num">[04]</span>
+      <h2 class="stage__title">Applied LLM systems</h2>
+      <p class="stage__sub">Where most AI engineering jobs actually live in 2026. The model is a component; the system is the work.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s4-n1">
+        <div class="node__body">
+          <h3><label for="s4-n1">Prompting as engineering</label></h3>
+          <p>Instruction structure, few-shot examples and their selection, chain-of-thought and when it does not help, role and system prompts, delimiters, and prompt versioning.</p>
+          <p class="node__why"><b>Why it matters:</b> the discipline, not the tricks. A prompt that is not versioned, not tested against a fixed set of cases, and not owned by anyone is a production dependency nobody controls. Teams discover this when someone "improves" a prompt and a downstream parser starts failing silently.</p>
+          <p class="node__prove"><b>Prove it:</b> put your prompts in version control with a test suite of at least twenty input/expected-behaviour pairs that runs in CI. Then demonstrate a prompt change that improves one case and regresses another — and show that your suite caught it.</p>
+          <p class="node__time">~15–25h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s4-n2">
+        <div class="node__body">
+          <h3><label for="s4-n2">Structured output and tool calling</label></h3>
+          <p>JSON mode, schema-constrained decoding, function and tool calling, validation and repair loops, and designing schemas a model can actually fill.</p>
+          <p class="node__why"><b>Why it matters:</b> this is the boundary between a demo and a system. Parsing prose with regular expressions works until it does not, at 3am. Constrained decoding that enforces a grammar during generation is categorically more reliable than asking politely and retrying, because invalid tokens are never sampled in the first place.</p>
+          <p class="node__prove"><b>Prove it:</b> build an extraction endpoint that returns schema-valid JSON on 1,000 consecutive adversarial inputs, with a defined behaviour for the cases it cannot handle. "It mostly works" is not the bar; the defined failure path is the deliverable.</p>
+          <p class="node__time">~20–30h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s4-n3">
+        <div class="node__body">
+          <h3><label for="s4-n3">Retrieval-augmented generation</label></h3>
+          <p>Chunking, embeddings, vector indexes, hybrid retrieval, reranking, context assembly, citation, and evaluation of both halves separately.</p>
+          <p class="node__why"><b>Why it matters:</b> RAG is the most common LLM architecture in production and the most commonly done badly. The characteristic failure is a fluent, confident, wrong answer, which is worse than no answer because it is trusted. Most teams evaluate the generation and never measure retrieval, so they cannot tell which half is broken.</p>
+          <p class="node__prove"><b>Prove it:</b> build a RAG system where you can state recall@k for retrieval and faithfulness for generation as separate numbers on a golden set you built yourself. Then use those numbers to say which half to fix first.</p>
+          <p class="node__time">~40–60h · <a href="rag.html">the full deep dive is here</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s4-n4">
+        <div class="node__body">
+          <h3><label for="s4-n4">Agents and tool use</label></h3>
+          <p>The reasoning-and-acting loop, tool design, planning, memory, multi-step error recovery, sandboxing, and cost and latency control.</p>
+          <p class="node__why"><b>Why it matters:</b> agents compound errors. A 95% per-step success rate over ten steps leaves you at roughly 60% end-to-end, which is why impressive demos so often fail as products. The engineering answer is fewer steps, verification between them, and designing tools that are hard to misuse.</p>
+          <p class="node__prove"><b>Prove it:</b> take an agent of yours and produce its per-step and end-to-end success rates on a fixed task set. Then cut the step count and show the end-to-end number move.</p>
+          <p class="node__time">~30–50h · <a href="articles/agents.html">architectures and failure taxonomy</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s4-n5">
+        <div class="node__body">
+          <h3><label for="s4-n5">Fine-tuning: mostly, when not to</label></h3>
+          <p>Full fine-tuning, LoRA and QLoRA, dataset construction, the quality-over-quantity result, catastrophic forgetting, and evaluating a fine-tune honestly.</p>
+          <p class="node__why"><b>Why it matters:</b> fine-tuning is the most over-reached-for tool in the field. It teaches form, style and format reliably; it is a poor and expensive way to add facts, which is what retrieval is for. Teams fine-tune to fix a knowledge problem, get a model that is confidently wrong in the right tone, and conclude the technique does not work.</p>
+          <p class="node__prove"><b>Prove it:</b> write the decision memo for a real case: what you tried first, why prompting and retrieval were insufficient, what the fine-tune costs to train and to serve, and the evaluation that would tell you it worked. Most such memos end with "do not fine-tune," and that is a successful outcome.</p>
+          <p class="node__time">~25–40h · <a href="articles/finetuning.html">decision guide</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s4-n6">
+        <div class="node__body">
+          <h3><label for="s4-n6">Guardrails and failure handling</label></h3>
+          <p>Input and output validation, prompt-injection defence, PII handling, refusal behaviour, rate limiting, fallbacks, and graceful degradation.</p>
+          <p class="node__why"><b>Why it matters:</b> any system that puts untrusted text into a model's context has an injection surface, and retrieval systems put untrusted text into context by design. Treat retrieved content as data, never as instructions, and assume any tool the model can call can be triggered by content it retrieves.</p>
+          <p class="node__prove"><b>Prove it:</b> write an injection payload that makes your own RAG system ignore its system prompt. Then implement a mitigation and show the payload failing. If you have not attacked your own system, you do not know its behaviour.</p>
+          <p class="node__time">~20–30h</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===================== STAGE 05 ===================== -->
+  <section class="stage" id="stage-05">
+    <div class="stage__head">
+      <span class="stage__num">[05]</span>
+      <h2 class="stage__title">Production and LLMOps</h2>
+      <p class="stage__sub">The stage that separates people who build demos from people who are trusted with revenue.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s5-n1">
+        <div class="node__body">
+          <h3><label for="s5-n1">Serving and inference optimisation</label></h3>
+          <p>Prefill against decode, KV cache memory arithmetic, continuous batching, quantisation, speculative decoding, and the throughput–latency trade-off.</p>
+          <p class="node__why"><b>Why it matters:</b> inference is where the money goes, for the entire life of the product. Prefill is compute-bound and decode is memory-bandwidth-bound, and confusing the two leads to optimising the wrong thing. Continuous batching is typically the largest single throughput win available on a shared endpoint.</p>
+          <p class="node__prove"><b>Prove it:</b> compute the KV cache size for a given model, batch size and context length, and state the batch size at which you run out of memory. Then explain why time-to-first-token and inter-token latency need separate budgets.</p>
+          <p class="node__time">~30–45h · <a href="articles/inference.html">serving economics</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s5-n2">
+        <div class="node__body">
+          <h3><label for="s5-n2">Evaluation infrastructure</label></h3>
+          <p>Golden sets, task decomposition, programmatic checks before model-based ones, LLM-as-judge and its calibration, regression suites, and online evaluation.</p>
+          <p class="node__why"><b>Why it matters:</b> without evaluation you are not engineering, you are guessing with extra steps. This is the single highest-leverage investment in an LLM product and consistently the most deferred. An unjudged system cannot be improved deliberately, only changed.</p>
+          <p class="node__prove"><b>Prove it:</b> build an eval suite that runs in CI, produces a number you trust, and has caught at least one regression before it shipped. Report your judge's agreement rate with human labels — an uncalibrated judge is a random number generator with good manners.</p>
+          <p class="node__time">~30–50h · <a href="articles/evaluation.html">how to build one</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s5-n3">
+        <div class="node__body">
+          <h3><label for="s5-n3">Observability for probabilistic systems</label></h3>
+          <p>Tracing multi-step calls, logging prompts and completions with PII controls, token and latency and cost metrics, drift detection, and user feedback capture.</p>
+          <p class="node__why"><b>Why it matters:</b> traditional monitoring tells you the service returned 200. It cannot tell you the answers got worse. You need output-quality signals, and you need the trace to attribute a bad answer to the retrieval step, the prompt, or the model.</p>
+          <p class="node__prove"><b>Prove it:</b> from a single production request id, reconstruct every model call, every retrieved document, the token counts, the latency breakdown and the cost. If any link is missing, your incident reviews are guesswork.</p>
+          <p class="node__time">~25–40h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s5-n4">
+        <div class="node__body">
+          <h3><label for="s5-n4">Data and indexing pipelines</label></h3>
+          <p>Ingestion, incremental and idempotent indexing, backfills, schema evolution, deletion and the right to be forgotten, and data versioning.</p>
+          <p class="node__why"><b>Why it matters:</b> a RAG index is a derived dataset that must stay consistent with a source of truth that keeps changing. Full reindexing is affordable at prototype scale and ruinous later. Deletion is a legal requirement, not a feature, and it has to reach the index and every cache.</p>
+          <p class="node__prove"><b>Prove it:</b> implement incremental indexing where re-running the pipeline on unchanged input is a no-op, and a delete propagates to the index and all caches within a stated time bound. Prove the no-op with a checksum, not by inspection.</p>
+          <p class="node__time">~25–40h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s5-n5">
+        <div class="node__body">
+          <h3><label for="s5-n5">Cost engineering</label></h3>
+          <p>Token accounting per request, prompt caching, model routing by difficulty, context compression, batch processing, and knowing when self-hosting becomes cheaper than an API.</p>
+          <p class="node__why"><b>Why it matters:</b> LLM costs scale with usage, so success is what bankrupts you. Cost per successful outcome — not per token, not per request — is the number that governs the business, and it is the one nobody instruments by default.</p>
+          <p class="node__prove"><b>Prove it:</b> compute your cost per successful user outcome, then halve it without a measurable quality regression on your eval suite. Routing easy cases to a cheaper model is usually the first and largest win.</p>
+          <p class="node__time">~15–25h · <a href="startups.html#economics">worked arithmetic</a></p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s5-n6">
+        <div class="node__body">
+          <h3><label for="s5-n6">Deployment, rollout and rollback</label></h3>
+          <p>Shadow deployment, canaries, A/B tests, feature flags, model and prompt registries, and rollback procedures you have actually rehearsed.</p>
+          <p class="node__why"><b>Why it matters:</b> model changes are riskier than code changes because the blast radius is quality rather than availability — nothing errors, answers just get worse, and you find out from users. Shadow traffic lets you measure a new model on real inputs before it affects anyone.</p>
+          <p class="node__prove"><b>Prove it:</b> roll back a model or prompt version in production in under five minutes, from a state where you did not know in advance which version was bad. Rehearse it; do not assume it.</p>
+          <p class="node__time">~20–30h</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===================== STAGE 06 ===================== -->
+  <section class="stage" id="stage-06">
+    <div class="stage__head">
+      <span class="stage__num">[06]</span>
+      <h2 class="stage__title">Specialisation</h2>
+      <p class="stage__sub">Pick one and go deep. Breadth got you hired; depth is what gets you trusted with the hard problem.</p>
+    </div>
+    <p class="bar" data-stage-bar></p>
+    <ol class="nodes">
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s6-n1">
+        <div class="node__body">
+          <h3><label for="s6-n1">Recommender and ranking systems</label></h3>
+          <p>Candidate generation and ranking as separate stages, collaborative filtering, two-tower retrieval, learning to rank, cold start, feedback loops and position bias.</p>
+          <p class="node__why"><b>Why it matters:</b> recommenders are where the revenue is at most consumer companies, and they have a property almost nothing else does: the model's output changes the data it will be trained on next. Position bias means your logs record what users clicked given what you showed them, not what they preferred.</p>
+          <p class="node__prove"><b>Prove it:</b> explain why offline ranking metrics routinely fail to predict online engagement, and describe a specific correction for position bias in your training data.</p>
+          <p class="node__time">~60–100h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s6-n2">
+        <div class="node__body">
+          <h3><label for="s6-n2">Computer vision in production</label></h3>
+          <p>Detection and segmentation, vision transformers, augmentation strategy, edge deployment and quantisation, annotation quality, and handling domain shift.</p>
+          <p class="node__why"><b>Why it matters:</b> vision systems fail on distribution shift you can see with your own eyes — a new camera, different lighting, a changed mounting angle — which makes it the best domain for learning what shift actually does to a model. Annotation quality also caps your ceiling: you cannot exceed your labels.</p>
+          <p class="node__prove"><b>Prove it:</b> ship a model to a constrained device within a stated latency and memory budget, and quantify the accuracy you traded for it.</p>
+          <p class="node__time">~60–100h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s6-n3">
+        <div class="node__body">
+          <h3><label for="s6-n3">Speech and audio</label></h3>
+          <p>Speech recognition, speaker diarisation, text to speech, streaming architectures, and latency budgets for conversational systems.</p>
+          <p class="node__why"><b>Why it matters:</b> voice is the strictest real-time constraint in applied ML. Conversation tolerates only a few hundred milliseconds of response delay before it feels broken, and that budget has to cover recognition, the model, and synthesis — so every component is designed around streaming rather than batch.</p>
+          <p class="node__prove"><b>Prove it:</b> build a streaming pipeline and produce a latency budget per stage, showing where the time goes and which stage you would optimise first.</p>
+          <p class="node__time">~50–80h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s6-n4">
+        <div class="node__body">
+          <h3><label for="s6-n4">Multimodal systems</label></h3>
+          <p>Vision-language models, contrastive image–text training, document understanding, multimodal retrieval, and cross-modal evaluation.</p>
+          <p class="node__why"><b>Why it matters:</b> most enterprise documents are not plain text — they are tables, charts, diagrams and scans, and a pipeline that flattens them to text loses exactly the structure that carried the meaning. This is where a large amount of practical retrieval value currently sits unclaimed.</p>
+          <p class="node__prove"><b>Prove it:</b> build retrieval over documents containing tables and figures where the answers depend on that structure, and show it beating a text-only pipeline on a set you built.</p>
+          <p class="node__time">~50–80h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s6-n5">
+        <div class="node__body">
+          <h3><label for="s6-n5">Research engineering</label></h3>
+          <p>Reading papers efficiently, reproducing results, ablation design, experiment tracking, and distributed training at scale.</p>
+          <p class="node__why"><b>Why it matters:</b> the ability to reproduce a paper is rarer than it should be and immediately valuable. Ablation design is the deeper skill: knowing which single thing to remove to establish that a result came from the mechanism claimed rather than from the extra compute.</p>
+          <p class="node__prove"><b>Prove it:</b> reproduce a recent paper's headline result from the description alone, document every discrepancy you hit, and state which of them changed the conclusion.</p>
+          <p class="node__time">~80–120h</p>
+        </div>
+      </li>
+
+      <li class="node">
+        <input class="node__check" type="checkbox" id="s6-n6">
+        <div class="node__body">
+          <h3><label for="s6-n6">ML platform and infrastructure</label></h3>
+          <p>Feature stores, training orchestration, GPU scheduling and utilisation, model registries, multi-tenancy, and building the paved road other teams use.</p>
+          <p class="node__why"><b>Why it matters:</b> platform work multiplies every other engineer in the organisation. It is also the most reliable way to be genuinely senior without being the best modeller in the room: the constraint at most companies is iteration speed, and that is a platform problem.</p>
+          <p class="node__prove"><b>Prove it:</b> measure the time from "I have an idea" to "I have a trained model with a metric" for your team, then halve it. Report the before and after with evidence.</p>
+          <p class="node__time">~80–120h</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+</section>
+
+<section class="section">
+  <div class="prose">
+    <h2>What to read next</h2>
+  </div>
+  <div class="grid-3" style="margin-top:var(--sp-5)">
+    <div class="card">
+      <h3><a href="rag.html">RAG, properly</a></h3>
+      <p>The deep dive: chunking, indexes, hybrid retrieval, reranking, evaluation, and a failure-mode taxonomy with a diagnostic for each symptom.</p>
+      <span class="meta"><span class="k">read</span> <span class="v">~35m</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="interview.html">Interview bank</a></h3>
+      <p>120+ questions across eight tracks with real answers, and — where it discriminates — what a weak answer sounds like versus a strong one.</p>
+      <span class="meta"><span class="k">read</span> <span class="v">~40m</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="startups.html">Startup playbook</a></h3>
+      <p>Build, buy or fine-tune. Unit economics with the arithmetic shown. Why "we use an LLM" is not a moat, and what is.</p>
+      <span class="meta"><span class="k">read</span> <span class="v">~25m</span></span>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>This is a gift, not a funnel.</b> No email, no course, nothing to buy.</p>
+    <p>If it was useful, the only thing I would ask is that you share it with someone it would help — and follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> on X, where I post more of this.</p>
+  </div>
+</section>
+
+</div>
+</main>

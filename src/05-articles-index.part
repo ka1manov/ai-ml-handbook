@@ -1,0 +1,71 @@
+path: articles/index.html
+title: Long Reads on AI/ML Engineering
+ogtitle: Long Reads on AI/ML Engineering
+desc: Six deep technical articles — transformer internals, inference economics, fine-tuning decisions, evaluation engineering, vector search internals, and agent architectures.
+og: og-articles.png
+---
+<main id="main">
+<div class="shell">
+
+<section class="pagehead">
+  <p class="prompt">ls -lh ~/ai-ml-handbook/articles/</p>
+  <h1>Long reads</h1>
+  <p class="lede">Six articles that go deeper than the roadmap has room for. Each one covers a mechanism, the trade-offs it forces, and the failure modes that follow — the things that decide whether a system works in production rather than in a notebook.</p>
+  <p class="meta"><span class="k">articles</span> <span class="v">6</span><span class="sep">|</span><span class="k">words</span> <span class="v">~16k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~76m total</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
+
+  <div class="toc" style="margin-top:var(--sp-6)">
+    <h2>articles/</h2>
+    <ul class="tree">
+      <li class="tree__item"><span class="tree__pre">├──</span><a href="transformers.html">transformers.html</a><span class="tree__note">transformers</span></li>
+      <li class="tree__item"><span class="tree__pre">├──</span><a href="inference.html">inference.html</a><span class="tree__note">where the money goes when you serve a language model</span></li>
+      <li class="tree__item"><span class="tree__pre">├──</span><a href="finetuning.html">finetuning.html</a><span class="tree__note">fine-tuning</span></li>
+      <li class="tree__item"><span class="tree__pre">├──</span><a href="evaluation.html">evaluation.html</a><span class="tree__note">evaluation engineering</span></li>
+      <li class="tree__item"><span class="tree__pre">├──</span><a href="vector-search.html">vector-search.html</a><span class="tree__note">vector search internals</span></li>
+      <li class="tree__item"><span class="tree__pre">└──</span><a href="agents.html">agents.html</a><span class="tree__note">agents</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="section">
+  <div class="grid-2">
+    <div class="card">
+      <h3><a href="transformers.html">Transformers, from attention to KV cache</a></h3>
+      <p>Scaled dot-product attention and why it is scaled. Multi-head projections as a partition rather than an addition. Positional encoding from absolute to RoPE, and the algebra that makes rotation encode relative position. Then the KV cache, and how it stops being an optimisation and becomes the constraint that decides your batch size.</p>
+      <span class="meta"><span class="k">words</span> <span class="v">~2.7k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~13m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="inference.html">Where the money goes when you serve a language model</a></h3>
+      <p>Prefill is compute-bound and decode is memory-bandwidth-bound, and almost every serving mistake comes from conflating them. Continuous batching, paged attention, quantisation, speculative decoding — with a table of which lever moves which metric, because several trade directly against each other.</p>
+      <span class="meta"><span class="k">words</span> <span class="v">~2.6k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~12m</span><span class="sep">|</span><span class="k">level</span> <span class="v">senior</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="finetuning.html">Fine-tuning: mostly, a guide to not doing it</a></h3>
+      <p>Fine-tuning teaches form; retrieval supplies facts. Confusing those is the most expensive mistake in applied LLM work. The decision framework, the ladder of cheaper things to try first, LoRA and QLoRA mechanics, DPO against RLHF, and the costs nobody budgets for.</p>
+      <span class="meta"><span class="k">words</span> <span class="v">~2.7k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~13m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="evaluation.html">Evaluation engineering</a></h3>
+      <p>The work that makes an LLM product improvable rather than merely changeable. Building a golden set that is not contaminated, decomposing the pipeline so a regression is attributable, programmatic checks before model-based ones, calibrating a judge so its numbers mean something, and a paired bootstrap before believing a small difference.</p>
+      <span class="meta"><span class="k">words</span> <span class="v">~2.7k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~13m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="vector-search.html">Vector search internals</a></h3>
+      <p>How flat, IVF, product quantisation and HNSW actually work, and which parameter moves which point on the recall–latency–memory triangle. Tuning against a measured target rather than a feeling. And why filtered search breaks ANN indexes, with the three things production systems do about it.</p>
+      <span class="meta"><span class="k">words</span> <span class="v">~2.5k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~12m</span><span class="sep">|</span><span class="k">level</span> <span class="v">senior</span></span>
+    </div>
+    <div class="card">
+      <h3><a href="agents.html">Agents, and why they fail</a></h3>
+      <p>Per-step success raised to the number of steps is the arithmetic that governs everything, and it explains the whole gap between the demo and the product. Tool design, context management, a failure taxonomy with mechanisms rather than symptoms, the security model, and why the right answer is often to write the sequence instead.</p>
+      <span class="meta"><span class="k">words</span> <span class="v">~2.7k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~13m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span></span>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>If any of these are useful, share them with someone building the same thing — and follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> on X.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">also</span> <span class="v"><a href="../index.html">the roadmap</a></span><span class="sep">|</span><span class="v"><a href="../rag.html">RAG deep dive</a></span><span class="sep">|</span><span class="v"><a href="../interview.html">interview questions</a></span><span class="sep">|</span><span class="v"><a href="../tips.html">field notes</a></span></p>
+  </div>
+</section>
+
+</div>
+</main>

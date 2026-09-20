@@ -1,0 +1,322 @@
+path: articles/agents.html
+title: Agent Architectures and Why They Fail
+ogtitle: Agent Architectures and Why They Fail
+desc: The reasoning-and-acting loop, tool design, planning and memory, error compounding across steps, the failure taxonomy, and what actually survives contact with production.
+og: og-articles.png
+ogtype: article
+readbar: yes
+scripts: rail
+---
+<main id="main">
+<div class="shell">
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">cat ~/articles/agents.md</p>
+  <h1>Agents, and why they fail</h1>
+  <p class="lede">Agent demos are spectacular and agent products are hard, and the gap between them is almost entirely one piece of arithmetic. This covers the loop, how to design tools a model can actually use, the failure taxonomy, and the architectural choices that make the difference in production.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~3.2k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~15m</span><span class="sep">|</span><span class="k">level</span> <span class="v">mid → senior</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
+</section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#arithmetic">The arithmetic that governs everything</a></li>
+      <li><a href="#loop">The loop</a></li>
+      <li><a href="#tools">Designing tools a model can use</a></li>
+      <li><a href="#context">Context and memory</a></li>
+      <li><a href="#taxonomy">The failure taxonomy</a></li>
+      <li><a href="#patterns">What actually works</a></li>
+      <li><a href="#security">The security model</a></li>
+      <li><a href="#eval">Evaluating an agent</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="arithmetic">
+  <div class="prose">
+    <h2>The arithmetic that governs everything</h2>
+
+    <p>Start here, because every architectural decision later on follows from it.</p>
+
+<pre><code>end_to_end_success = per_step_success ^ n_steps
+
+  95% per step, 10 steps  ->  0.95^10  = 60%
+  95% per step, 20 steps  ->  0.95^20  = 36%
+  99% per step, 20 steps  ->  0.99^20  = 82%
+  90% per step,  5 steps  ->  0.90^5   = 59%
+</code></pre>
+
+    <p>A 95% success rate per step sounds excellent. Over ten steps it produces a system that fails four times in ten. That is the entire gap between the demo — which was five steps and got lucky — and the product.</p>
+
+    <p>Two consequences, and they point in the same direction.</p>
+
+    <p><b>Fewer steps beats better prompts.</b> Going from 10 steps to 5 at the same per-step rate takes you from 60% to 77%. Getting per-step accuracy from 95% to 97% takes you to 74%. Cutting steps is usually both easier and more effective, and it is the lever people reach for last.</p>
+
+    <p><b>Verification between steps changes the exponent into something manageable.</b> If a failed step is detected and retried rather than propagating, the effective per-step rate rises toward the rate at which failures are <i>detectable</i> — which is often far higher than the rate at which they do not occur. This is why the single most valuable thing you can add to an agent is usually a check, not a capability.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the design question this implies</span>
+      <p>Before building an agent, ask: what is the smallest number of steps that could accomplish this, and which of those steps can be verified automatically?</p>
+      <p>If the honest answer is "twenty steps, none verifiable," you do not have an agent problem yet — you have a workflow that needs decomposing into pieces with checkable outputs, or a product scope that needs narrowing.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="loop">
+  <div class="prose">
+    <h2>The loop</h2>
+
+    <p>Strip away the frameworks and every agent is the same loop.</p>
+
+<pre><code>state = initial_context(task)
+
+<span class="c-kw">for</span> step <span class="c-kw">in</span> <span class="c-fn">range</span>(MAX_STEPS):              <span class="c-com"># always bounded</span>
+    action = model(state, tools)         <span class="c-com"># decide</span>
+    <span class="c-kw">if</span> action.is_final:
+        <span class="c-kw">return</span> action.answer
+
+    result = execute(action)             <span class="c-com"># act</span>
+    state  = state + [action, result]    <span class="c-com"># observe</span>
+
+<span class="c-kw">return</span> give_up_gracefully(state)          <span class="c-com"># the path people forget</span>
+</code></pre>
+
+    <p>Three properties of this loop cause most production problems.</p>
+
+    <p><b>State grows monotonically.</b> Every step appends. Twenty steps of tool calls and results is a very long context, which costs money, slows every subsequent step, and pushes earlier material into the region models attend to least. An agent that has been running for a while is a worse agent than it was at the start.</p>
+
+    <p><b>Errors persist in the context.</b> A failed tool call with a confusing error message stays in the state and continues influencing every future decision. Models frequently get stuck re-attempting a variation of the same failed action because the failure is sitting right there in the context, shaping the next prediction.</p>
+
+    <p><b>The loop must be bounded and must have a give-up path.</b> An unbounded loop with an intermittent failure is an unbounded bill. And "gave up gracefully with a partial result and an explanation" is a much better product outcome than "hit the step limit and returned nothing," yet the second is the default in most implementations.</p>
+  </div>
+
+  <figure class="fig">
+    <svg viewBox="0 0 860 360" role="img" aria-label="Diagram of an agent loop with its failure points marked. The model decides an action from the current state and available tools, the action is validated, executed, and the result appended to state before looping. Failure points marked are: wrong tool chosen or hallucinated, malformed arguments, tool error or timeout, context growth degrading later steps, and hitting the step limit without a graceful give-up path.">
+      <rect class="dg-box dg-box--accent" x="40" y="28" width="150" height="46"/>
+      <text class="dg-text" x="56" y="56">task + context</text>
+
+      <path class="dg-line--accent" d="M115 74 V108"/><path class="dg-fill--accent" d="M111 102 l4 8 4 -8 z"/>
+
+      <rect class="dg-box" x="40" y="108" width="150" height="52"/>
+      <text class="dg-text" x="56" y="130">model decides</text>
+      <text class="dg-text--dim" x="56" y="147">state + tools</text>
+
+      <path class="dg-line--accent" d="M190 134 H250"/><path class="dg-fill--accent" d="M244 130 l8 4 -8 4 z"/>
+
+      <rect class="dg-box" x="252" y="108" width="150" height="52"/>
+      <text class="dg-text" x="268" y="130">validate args</text>
+      <text class="dg-text--dim" x="268" y="147">schema + policy</text>
+
+      <path class="dg-line--accent" d="M402 134 H462"/><path class="dg-fill--accent" d="M456 130 l8 4 -8 4 z"/>
+
+      <rect class="dg-box" x="464" y="108" width="150" height="52"/>
+      <text class="dg-text" x="480" y="130">execute tool</text>
+      <text class="dg-text--dim" x="480" y="147">timeout, sandbox</text>
+
+      <path class="dg-line--accent" d="M614 134 H674"/><path class="dg-fill--accent" d="M668 130 l8 4 -8 4 z"/>
+
+      <rect class="dg-box dg-box--accent" x="676" y="108" width="150" height="52"/>
+      <text class="dg-text" x="692" y="130">append result</text>
+      <text class="dg-text--dim" x="692" y="147">state grows</text>
+
+      <path class="dg-line--accent" d="M751 160 V196 H115 V160"/><path class="dg-fill--accent" d="M111 166 l4 -8 4 8 z"/>
+      <text class="dg-text--accent" x="380" y="190">loop, bounded</text>
+
+      <text class="dg-text--dim" x="40" y="242">failure points:</text>
+      <line class="dg-line" x1="40" y1="250" x2="820" y2="250" stroke-dasharray="3 4"/>
+      <text class="dg-text--dim" x="40" y="272">1  wrong or hallucinated tool</text>
+      <text class="dg-text--dim" x="252" y="272">2  malformed arguments</text>
+      <text class="dg-text--dim" x="464" y="272">3  tool error or timeout</text>
+      <text class="dg-text--dim" x="676" y="272">4  context bloat</text>
+      <text class="dg-text--dim" x="40" y="296">5  stuck retrying the same failed action, because the failure is still in the context</text>
+      <text class="dg-text--dim" x="40" y="320">6  step limit reached with no graceful give-up path — returns nothing instead of a partial result</text>
+    </svg>
+    <figcaption>Every arrow is a place a step can fail, and the exponent in the arithmetic above is the number of times you traverse them. Validation before execution is the cheapest of these to add and catches the most.</figcaption>
+  </figure>
+</section>
+
+<section class="section" id="tools">
+  <div class="prose">
+    <h2>Designing tools a model can use</h2>
+
+    <p>Tool design is the highest-leverage and least-discussed part of building agents. A well-designed tool raises per-step success directly, and per-step success is in the exponent.</p>
+
+    <p><b>Name and describe tools for a reader who has no other context.</b> The model sees the name, the description, and the parameter schema — nothing else. <code>query_db</code> with the description "queries the database" is unusable. <code>find_customer_orders</code> described as "returns a customer's orders from the last 90 days, most recent first; returns an empty list if the customer has none" is usable, because it says what it does, what it returns, and what happens in the empty case.</p>
+
+    <p><b>Make wrong calls impossible rather than detectable.</b> Enums instead of free-text strings. Required parameters that are genuinely required. Types the schema enforces. Every constraint you push into the schema is a failure the model cannot make, which is strictly better than a failure you catch afterwards.</p>
+
+    <p><b>Fewer tools, better chosen.</b> Selection accuracy falls as the tool count rises, and with thirty tools models start picking plausible-but-wrong ones. If you have many, group them behind a router — a first call that selects a small relevant subset, then a second with only those available.</p>
+
+    <p><b>Design tools around tasks, not around your API surface.</b> Exposing your twelve REST endpoints as twelve tools forces the model to compose them correctly, which is twelve chances to fail. One tool that does the composition internally is one step instead of four, and — per the arithmetic — that is the single most effective change available.</p>
+
+    <p><b>Return results the model can act on.</b> A 400 with a stack trace teaches it nothing. "Invalid date format; expected YYYY-MM-DD, received 03/04/2024" tells it exactly what to fix, and models recover from that reliably. Error messages are prompt engineering.</p>
+
+    <p><b>Keep results small.</b> A tool returning 5,000 rows poisons the context for every subsequent step. Paginate, summarise, or return references the model can expand selectively.</p>
+
+    <p><b>Make retries safe.</b> Agents retry. If a tool has side effects, give it an idempotency key so a retried call does not duplicate the action. This is the difference between an agent that occasionally fails and one that occasionally sends two emails.</p>
+  </div>
+</section>
+
+<section class="section" id="context">
+  <div class="prose">
+    <h2>Context and memory</h2>
+
+    <p>Because state grows monotonically, managing it is not an optimisation — it is what keeps a long-running agent working at step 30 as well as it did at step 3.</p>
+
+    <p><b>Summarise the middle.</b> Keep the original task and the most recent few exchanges verbatim, and compress what is between them. This preserves the two regions models attend to most reliably while cutting the bulk.</p>
+
+    <p><b>Drop or truncate large tool outputs once used.</b> A 4,000-token document retrieved at step 3 rarely needs to remain verbatim at step 15. Replace it with a short summary and a reference.</p>
+
+    <p><b>Keep a structured scratchpad outside the conversation.</b> Rather than relying on the model to remember its findings from the transcript, maintain explicit state — facts established, subtasks completed, open questions — and render it into the prompt fresh each step. This is markedly more reliable than transcript recall and it makes the agent's state inspectable, which matters enormously when debugging.</p>
+
+    <p><b>Distinguish the kinds of memory.</b> Working memory is this task's state. Episodic memory is what happened in previous sessions, usually retrieved rather than carried. Semantic memory is durable facts about the user or domain, which is a retrieval problem and should be treated as one. Conflating them produces an agent that either forgets everything or drags everything along.</p>
+  </div>
+</section>
+
+<section class="section" id="taxonomy">
+  <div class="prose">
+    <h2>The failure taxonomy</h2>
+  </div>
+
+  <div class="scroll-x" style="margin-top:var(--sp-5)">
+    <table>
+      <caption>Symptom, mechanism, and the fix that addresses the mechanism rather than the symptom.</caption>
+      <thead>
+        <tr><th>Symptom</th><th>What is actually happening</th><th>Fix</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Loops on the same action</b></td>
+          <td>The failed attempt is still in the context, shaping the next prediction toward a variation of it</td>
+          <td>Detect repetition explicitly. After two failures of the same tool, remove the attempts from context and force a different strategy or escalate.</td>
+        </tr>
+        <tr>
+          <td><b>Calls a tool that does not exist</b></td>
+          <td>Plausible completion; the model is predicting a name that fits the pattern of the others</td>
+          <td>Constrained decoding over the actual tool set. Validate before execution and return a clear list of what is available.</td>
+        </tr>
+        <tr>
+          <td><b>Right tool, wrong arguments</b></td>
+          <td>Schema underspecified, or the description does not say what the parameter means</td>
+          <td>Tighten the schema — enums, formats, ranges. Give examples in the description. Return actionable validation errors.</td>
+        </tr>
+        <tr>
+          <td><b>Stops early, claims done</b></td>
+          <td>Long context has pushed the original task out of the region it attends to</td>
+          <td>Restate the task and the completion criteria in every step's prompt, not only the first.</td>
+        </tr>
+        <tr>
+          <td><b>Degrades as the run lengthens</b></td>
+          <td>Context bloat; signal diluted by accumulated tool output</td>
+          <td>Summarise the middle, truncate used outputs, maintain a structured scratchpad.</td>
+        </tr>
+        <tr>
+          <td><b>Confidently reports a result it did not obtain</b></td>
+          <td>Nothing verified the claim against the tool output; the model narrated a plausible outcome</td>
+          <td>Verify programmatically. If the agent says it booked something, check the booking exists before reporting success.</td>
+        </tr>
+        <tr>
+          <td><b>Wildly variable cost per task</b></td>
+          <td>Unbounded steps, unbounded retries, unbounded tool output</td>
+          <td>Cap steps, cap retries, cap result size, and cap total tokens per task. Budget as a hard limit, not a target.</td>
+        </tr>
+        <tr>
+          <td><b>Works in testing, fails on real tasks</b></td>
+          <td>Test tasks were clean and short; real ones are ambiguous and long</td>
+          <td>Build the evaluation set from real tasks including the messy ones, and measure per-step and end-to-end separately.</td>
+        </tr>
+        <tr>
+          <td><b>Does something destructive</b></td>
+          <td>A tool with side effects was reachable without confirmation, possibly triggered by retrieved content</td>
+          <td>Separate read from write tools. Require explicit confirmation for irreversible actions. Never expose a destructive tool on a path that processes untrusted input.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="patterns">
+  <div class="prose">
+    <h2>What actually works</h2>
+
+    <p>The patterns that survive production, roughly in order of how often they are the right answer.</p>
+
+    <p><b>Do not build an agent.</b> Most tasks framed as agentic are a fixed sequence of steps with a model call at each. If you know the sequence, write the sequence. A deterministic pipeline with model calls inside it is dramatically more reliable, cheaper, easier to test and easier to debug than a model deciding the control flow. Reserve agency for genuine cases where the path cannot be known in advance.</p>
+
+    <p><b>Constrain the search space.</b> Even where dynamic control flow is needed, it rarely needs to be unrestricted. A router that picks among five known workflows gets you most of the flexibility with a fraction of the failure surface.</p>
+
+    <p><b>Verify between steps.</b> After each action, check the result programmatically where you can. Did the file get written, does the returned JSON match the schema, is the number in a plausible range. Cheap, deterministic, and it converts silent failure into a retry.</p>
+
+    <p><b>Plan once, then execute.</b> Generating a plan upfront and then executing it is more debuggable than deciding each step in isolation, because the plan is inspectable before anything happens and a bad plan is visible immediately. Re-plan on failure rather than continuously.</p>
+
+    <p><b>Put a human at the irreversible points.</b> Not on every step — that defeats the purpose — but on anything that spends money, sends a message, deletes data or cannot be undone. Users tolerate a confirmation far better than a mistake.</p>
+
+    <p><b>Specialise rather than generalise.</b> An agent with four tools and a narrow task outperforms one with thirty and a broad remit, and it can actually be evaluated.</p>
+
+    <p>On <b>multi-agent architectures</b>: they are appealing and they multiply the arithmetic problem rather than solving it. Each agent has its own per-step failure rate, and the handoffs between them are additional failure points with no shared context. They are justified when subtasks genuinely need separate tool sets or separate context, not as a default structure. Be sceptical of a design where the main benefit claimed is conceptual tidiness.</p>
+  </div>
+</section>
+
+<section class="section" id="security">
+  <div class="prose">
+    <h2>The security model</h2>
+
+    <p>Agents have a specific and serious risk profile, because they combine three things that are individually manageable and jointly dangerous: <b>untrusted input, tool access, and actions with side effects.</b></p>
+
+    <p>The attack is straightforward. Content the agent processes — a web page, an email, a retrieved document, a file a user uploaded — contains instructions addressed to the model. The model, which has no reliable way to distinguish data from instructions, follows them. Now an attacker is issuing tool calls with your agent's permissions.</p>
+
+    <p>What actually helps:</p>
+
+    <p><b>Separate the three.</b> If an agent processes untrusted content, it should not simultaneously hold destructive tools. Split into a stage that reads and summarises with no tools and a stage that acts on a validated structured result. This is architectural and it is the only mitigation that is robust rather than probabilistic.</p>
+
+    <p><b>Least privilege, per invocation.</b> Scope credentials to the specific task and the specific user. An agent operating with broad service credentials turns any successful injection into a broad compromise.</p>
+
+    <p><b>Validate actions against a policy, not against the model's judgement.</b> A deterministic check — this user may access this resource, this amount is under the limit, this recipient is on the allowlist — outside the model, on every call. Never rely on the system prompt to enforce a boundary.</p>
+
+    <p><b>Sandbox execution.</b> Anything running generated code needs isolation, resource limits and no network by default.</p>
+
+    <p><b>Log every tool call with its arguments and result.</b> Both for incident investigation and because an anomaly in the tool-call pattern is often the first detectable sign of an injection.</p>
+
+    <p><b>Attack your own agent.</b> Write the injection payload, confirm it works, fix it, confirm the payload now fails. Until you have done that you are guessing about your system's behaviour rather than knowing it.</p>
+  </div>
+</section>
+
+<section class="section" id="eval">
+  <div class="prose">
+    <h2>Evaluating an agent</h2>
+
+    <p>End-to-end success alone is insufficient, because when it drops you cannot tell where. Measure the components:</p>
+
+    <p><b>Per-step accuracy</b> — did each step choose the right tool with the right arguments. The number in the exponent, and the one most worth improving.</p>
+
+    <p><b>End-to-end success</b> — was the task completed correctly. The number that matters to users.</p>
+
+    <p><b>Step count distribution</b>, not the mean. A long tail of 40-step runs is where your cost and your timeouts live, and the mean hides it entirely.</p>
+
+    <p><b>Cost and latency per completed task</b>, denominated by successful completion. An agent that fails half the time has twice the effective cost of its per-run figure.</p>
+
+    <p><b>Recovery rate</b> — when a step fails, how often does the agent recover rather than derailing. This is the number that distinguishes a fragile agent from a robust one, and almost nobody measures it. Inject synthetic tool failures deliberately and see what happens; the results are usually sobering and immediately actionable.</p>
+
+    <p>Build the evaluation set from real tasks, including the ambiguous ones and the ones that should be refused or escalated. And log full traces — every step, every tool call, every result — because agent debugging without traces is not debugging, it is speculation.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the compressed version</span>
+      <p>Success is per-step accuracy raised to the number of steps, so cut steps before you tune prompts. Design tools around tasks rather than around your API. Return errors a model can act on. Verify between steps and keep a structured scratchpad outside the transcript. Bound the loop and give up gracefully. Never combine untrusted input, tools and irreversible actions in one stage. And before building an agent at all, check whether you already know the sequence — because if you do, write the sequence.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> for more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="evaluation.html">evaluation engineering</a></span><span class="sep">|</span><span class="v"><a href="../rag.html">RAG, properly</a></span><span class="sep">|</span><span class="v"><a href="../index.html">the roadmap</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
+</div>
+</main>
