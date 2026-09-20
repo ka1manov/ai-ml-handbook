@@ -1,17 +1,296 @@
 path: tips.html
 title: 50 Field Notes for AI/ML Engineers
+ogtitle: 50 Field Notes for AI/ML Engineers
 desc: Fifty concentrated, opinionated lessons from building machine learning systems that run in production — each one a claim and the reason it is true.
 og: og-tips.png
 ogtype: article
 readbar: yes
-scripts: progress
+scripts: rail
 ---
 <main id="main">
 <div class="shell">
-<section class="pagehead">
-<h1>50 Field Notes for AI/ML Engineers</h1>
-<p class="lede">Being written.</p>
-<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">tail -n 50 ~/notes/field.log</p>
+  <h1>50 field notes</h1>
+  <p class="lede">The things that only show up after you have shipped something and watched it break. Each one is a claim plus the reason it is true — no filler, and nothing here that I would not say in a code review.</p>
+  <p class="meta"><span class="k">notes</span> <span class="v">50</span><span class="sep">|</span><span class="k">read</span> <span class="v">~12m</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
 </section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#data">Data</a></li>
+      <li><a href="#modelling">Modelling</a></li>
+      <li><a href="#llm-application-work">LLM application work</a></li>
+      <li><a href="#evaluation">Evaluation</a></li>
+      <li><a href="#production">Production</a></li>
+      <li><a href="#working">Working</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="data">
+  <div class="prose">
+    <h2>Data</h2>
+  </div>
+  <div style="margin-top:var(--sp-5)">
+    <div class="tip">
+      <span class="tip__n">01</span>
+      <div class="tip__body"><b>Look at your data. Actually look at it.</b>Not <code>df.describe()</code> — open fifty rows and read them. Every experienced practitioner has a story about a month lost to something that was visible on inspection: a duplicated column, a placeholder date of 1970-01-01, labels shifted by one, an encoding that turned every apostrophe into mojibake. This is the highest-return hour in the whole job and almost nobody spends it.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">02</span>
+      <div class="tip__body"><b>Your label is the product, and it is probably wrong.</b>Model architecture is a rounding error next to label quality. Before optimising anything, double-label a sample and compute agreement. That number is your ceiling: if two humans agree 85% of the time, a model scoring 90% is exploiting an artefact, not being clever.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">03</span>
+      <div class="tip__body"><b>Point-in-time correctness is not a detail.</b>Every feature must use only information that existed at prediction time. This single discipline prevents more production failures than any modelling technique, and violating it produces a beautiful offline number and a flat A/B test.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">04</span>
+      <div class="tip__body"><b>Missing is a value, not an absence.</b>A user who left a field blank is different from one who filled it in. Adding an explicit indicator column preserves that signal; silently imputing the mean destroys it and tells the model a confident lie.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">05</span>
+      <div class="tip__body"><b>Normalise before you deduplicate.</b>Most 'near duplicates' in a real corpus are exact duplicates wearing different whitespace, case and boilerplate. Cheap string normalisation removes more duplication than any clever similarity method.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">06</span>
+      <div class="tip__body"><b>If your data pipeline is not idempotent, it is not finished.</b>Rerunning on unchanged input must be a no-op, provable with a checksum rather than by inspection. Without it every backfill is a gamble and every failure is a full rebuild.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="modelling">
+  <div class="prose">
+    <h2>Modelling</h2>
+  </div>
+  <div style="margin-top:var(--sp-5)">
+    <div class="tip">
+      <span class="tip__n">07</span>
+      <div class="tip__body"><b>Always build the stupid baseline.</b>A regularised linear model or a constant predictor takes an hour and gives every later number a denominator. 'We got 0.87 AUC' means nothing on its own; '0.87 against a 0.81 baseline' is a result.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">08</span>
+      <div class="tip__body"><b>On tabular data, beat gradient boosting before reaching for a network.</b>The comparison is cheap and the answer is frequently that trees win at a fraction of the training and serving cost. If your tabular problem uses a neural network, be able to defend it with a measured comparison rather than a preference.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">09</span>
+      <div class="tip__body"><b>Overfit one batch before you train on everything.</b>If the model cannot memorise eight examples, it has a bug, not a data problem. This test takes seconds, has a binary answer, and eliminates an enormous class of defects before you spend a day on a real run.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">10</span>
+      <div class="tip__body"><b>Check that the initial loss is what theory says.</b>An n-class classifier should start near ln(n). If it does not, something is wrong before training has done anything — a doubled softmax, misaligned labels, a loss over the wrong axis.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">11</span>
+      <div class="tip__body"><b>Learning rate is the hyperparameter that matters. Tune it first, tune it properly.</b>More results have been left on the table by an untuned learning rate than by any architectural choice. A range test costs one short run.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">12</span>
+      <div class="tip__body"><b>Ranking well and being calibrated are different skills.</b>A model can order examples perfectly and still be systematically overconfident. The moment anything downstream treats the score as a probability — expected value, thresholds, budget pacing — calibration becomes the property that matters, and deep networks are poorly calibrated by default.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">13</span>
+      <div class="tip__body"><b>Complexity must earn its place with a measurement.</b>Every added stage is a new failure mode, a new thing to monitor, and a new thing the next engineer must understand. If you cannot show the number it moved, remove it.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="llm-application-work">
+  <div class="prose">
+    <h2>LLM application work</h2>
+  </div>
+  <div style="margin-top:var(--sp-5)">
+    <div class="tip">
+      <span class="tip__n">14</span>
+      <div class="tip__body"><b>Read the failures. Fifty of them, categorised.</b>The error distribution tells you what to fix, and it is almost never what you assumed. Teams that theorise about failures optimise the wrong stage for weeks; teams that read them fix the right one in a day.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">15</span>
+      <div class="tip__body"><b>Prompts are production code.</b>Version them, review them, test them, and own them. A prompt edited by anyone, tested by nobody, and deployed outside the release path is a production dependency nobody controls — and it is a leading cause of 'it got worse and we did not deploy anything'.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">16</span>
+      <div class="tip__body"><b>Fine-tuning teaches form. Retrieval supplies facts.</b>Confusing these is the most expensive mistake in applied LLM work. Fine-tuning to fix a knowledge gap produces a model that is confidently wrong in exactly the right tone.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">17</span>
+      <div class="tip__body"><b>Constrain the output rather than asking politely.</b>Schema-constrained decoding never samples an invalid token. Asking for JSON and retrying on parse failure is strictly worse and fails at the worst times.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">18</span>
+      <div class="tip__body"><b>Tell the model what to do when it does not know.</b>The single highest-value line in most system prompts. Without an explicit refusal instruction, an unanswerable question produces a fluent fabrication — which is the exact failure the system existed to prevent.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">19</span>
+      <div class="tip__body"><b>Retrieved text is data, never instructions.</b>Any document in your corpus may be adversarial, and in RAG the attacker's delivery mechanism is simply getting a document indexed. Delimit it, say so in the system prompt, and never let it reach a tool-calling path unexamined.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">20</span>
+      <div class="tip__body"><b>Five good chunks beat thirty mediocre ones.</b>A large context window is not an invitation to fill it. More context dilutes attention, costs proportionally more, and raises the chance of anchoring on a plausible irrelevant passage.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">21</span>
+      <div class="tip__body"><b>Log the transformed query, not just the original.</b>If you rewrite or expand queries before retrieval, the rewritten version is invisible in your logs by default — and it is the first thing you will want when an answer is baffling.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">22</span>
+      <div class="tip__body"><b>Agents compound errors multiplicatively.</b>Ninety-five percent per step over ten steps is about sixty percent end to end. The engineering answer is fewer steps and verification between them, not a better prompt.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">23</span>
+      <div class="tip__body"><b>Temperature zero is not deterministic in a batched server.</b>Floating-point reduction order varies with batch composition, so identical inputs can produce different outputs. Design tests that tolerate this rather than assuming exact reproducibility.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">24</span>
+      <div class="tip__body"><b>A large share of 'the model is stupid' reports are tokenisation.</b>Counting characters, arithmetic on long numbers, non-Latin scripts, and prompts with trailing whitespace all degrade for reasons that have nothing to do with reasoning.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="evaluation">
+  <div class="prose">
+    <h2>Evaluation</h2>
+  </div>
+  <div style="margin-top:var(--sp-5)">
+    <div class="tip">
+      <span class="tip__n">25</span>
+      <div class="tip__body"><b>Build the evaluation set before the feature.</b>Fifty real examples and a script is one day of work, and it changes everything afterwards: you can refactor without fear, compare models honestly, and answer 'did that help' with evidence rather than impressions.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">26</span>
+      <div class="tip__body"><b>Measure retrieval and generation separately.</b>A single end-to-end score averages two independent failure modes and tells you nothing actionable. The only useful question when a RAG answer is wrong is which half broke, and one number cannot answer it.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">27</span>
+      <div class="tip__body"><b>Programmatic checks before model-based ones.</b>Schema validity, citation ids that exist, length bounds, required disclaimers. Free, deterministic, and they catch a surprising share of real defects without anyone judging anything.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">28</span>
+      <div class="tip__body"><b>An uncalibrated judge is a random number generator with good manners.</b>Label fifty examples by hand, run your judge on them, and report the agreement. Without that number, every result your evaluation pipeline produces is decoration.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">29</span>
+      <div class="tip__body"><b>Include the questions your system should refuse.</b>A system that always answers has not been tested, it has been flattered. Measuring correct abstention is measuring the failure mode users actually complain about.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">30</span>
+      <div class="tip__body"><b>A flaky quality gate gets disabled within two weeks.</b>Pin dependencies, fix seeds, and make the evaluation set immutable and versioned. A non-deterministic CI check does not protect you; it trains the team to ignore red.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">31</span>
+      <div class="tip__body"><b>Benchmark scores are not production evidence.</b>Public benchmarks are a shortlist, not an answer. The ordering frequently does not transfer to your corpus, your queries or your definition of good.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">32</span>
+      <div class="tip__body"><b>Check segments, not just the average.</b>An overall improvement routinely conceals a serious regression for a minority of users, and that minority is often the one that complains loudest and churns first.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="production">
+  <div class="prose">
+    <h2>Production</h2>
+  </div>
+  <div style="margin-top:var(--sp-5)">
+    <div class="tip">
+      <span class="tip__n">33</span>
+      <div class="tip__body"><b>ML systems fail silently and stay up.</b>The service returns 200, latency is fine, and the answers have quietly become worse. Every alert you have says green. This is the fundamental operational difference from ordinary software, and it is why output-quality monitoring is not optional.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">34</span>
+      <div class="tip__body"><b>Training-serving skew is the most common production defect.</b>Log the actual feature vector used at inference, recompute it offline, and diff. Make that a scheduled job rather than a one-off investigation, because the divergence reappears every time someone touches either path.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">35</span>
+      <div class="tip__body"><b>Shadow deployment is the most valuable step teams skip.</b>Real traffic, real volume, zero user risk. It catches the operational failures — memory growth, tail latency, malformed inputs — that offline evaluation structurally cannot.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">36</span>
+      <div class="tip__body"><b>A rollback procedure nobody has executed is a hypothesis.</b>Rehearse it. Make the model version a config value so reverting is a flag flip rather than a redeploy, and time yourself doing it.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">37</span>
+      <div class="tip__body"><b>Deletion has to reach the caches too.</b>A document erased from the source and still sitting in a retrieval cache is still being served. If deletion was not designed in, retrofitting it into three layers of caching is genuinely hard and the deadline is usually legal.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">38</span>
+      <div class="tip__body"><b>Denominate cost by successful outcome, not by request.</b>A cheaper model that fails more often and triggers retries costs more. Cost per request cannot show you that; cost per outcome can, and it is the number that governs the business.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">39</span>
+      <div class="tip__body"><b>Idle accelerators are the most wasteful line in most ML budgets.</b>A surprising share of GPU fleets are input-bound — the device waiting on the data loader. It is invisible without profiling and expensive with it.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">40</span>
+      <div class="tip__body"><b>Instrument freshness as a number.</b>'Documents are searchable within five minutes' is a commitment you can alert on. 'We reindex nightly, probably' is not. Emit the age of the oldest un-indexed document.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">41</span>
+      <div class="tip__body"><b>One request id should reconstruct everything.</b>Every model call, every retrieved document, token counts, latency per stage, cost. If any link is missing, your incident reviews are guesswork dressed as analysis.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">42</span>
+      <div class="tip__body"><b>Automatic retraining without an evaluation gate is automatic deployment of a worse model.</b>The schedule is fine. The missing gate is what does the damage, and it has done real damage at real companies.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="working">
+  <div class="prose">
+    <h2>Working</h2>
+  </div>
+  <div style="margin-top:var(--sp-5)">
+    <div class="tip">
+      <span class="tip__n">43</span>
+      <div class="tip__body"><b>Iteration speed is the real constraint on model quality.</b>The team that runs twenty experiments a week beats the team that runs three, regardless of who is cleverer. Anything that shortens the loop from idea to measured result is modelling work, even when it looks like plumbing.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">44</span>
+      <div class="tip__body"><b>Reproduce something in your first two weeks on a new team.</b>Retrain an existing model and see whether you get the same number. Nothing else reveals the true state of reproducibility, data access and tooling that fast, and no document will tell you the truth.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">45</span>
+      <div class="tip__body"><b>Read the incident history before the architecture docs.</b>It tells you what the system actually does under stress, which is different from what it was designed to do.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">46</span>
+      <div class="tip__body"><b>Kill your own project when it deserves it.</b>Establishing early that the data cannot support the problem is a successful outcome, even though it does not feel like one. The expensive failure is spending a quarter hoping.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">47</span>
+      <div class="tip__body"><b>Describe what the model does mechanically, never what it 'understands'.</b>Anthropomorphising sets expectations that reality will violate, and the disappointment lands on you. Stating the mechanism and the failure modes builds the kind of trust that survives a bad week.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">48</span>
+      <div class="tip__body"><b>Report your own regressions before anyone else notices.</b>Trust with stakeholders is built far more by flagging a problem early than by announcing a win. It is also the only way to be believed the next time you say something is fine.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">49</span>
+      <div class="tip__body"><b>Fundamentals compound; releases do not.</b>Attention, evaluation, distribution shift and cost structure have been the same problems for years. Time spent there pays for a decade. Tracking weekly model launches pays until the next one.</div>
+    </div>
+    <div class="tip">
+      <span class="tip__n">50</span>
+      <div class="tip__body"><b>Propose the cheap decisive experiment instead of winning the argument.</b>A week of work that settles a disagreement is worth more than a month of being right, and it converts opinions into evidence — including when the evidence goes against you.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>If one of these saves you a week, send it to someone who is about to lose one — and follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> on X.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="index.html">the roadmap</a></span><span class="sep">|</span><span class="v"><a href="rag.html">RAG, properly</a></span><span class="sep">|</span><span class="v"><a href="interview.html">interview questions</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
 </div>
 </main>
