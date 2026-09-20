@@ -20,6 +20,16 @@ const NAV = [
   ['articles/index.html', 'articles'],
 ];
 
+/* Describes the card image itself. Sentence structure rather than dash
+   concatenation, because several titles already contain an em dash. */
+function alt(m) {
+  const t = (m.ogtitle || m.title).replace(/\s*—\s*/g, ': ');
+  const owned = /AI\/ML Engineering Handbook/i.test(t);
+  return owned
+    ? `Terminal-style card reading "${t}", by @ka1manov.`
+    : `Terminal-style card reading "${t}". From the AI/ML Engineering Handbook by @ka1manov.`;
+}
+
 function head(m) {
   const url = BASE_URL + (m.path === 'index.html' ? '' : m.path);
   return `<!doctype html>
@@ -38,7 +48,7 @@ function head(m) {
 <meta property="og:image" content="${BASE_URL}assets/img/${m.og}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="${m.ogtitle || m.title} — the AI/ML Engineering Handbook by @ka1manov">
+<meta property="og:image:alt" content="${alt(m)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@ka1manov">
 <meta name="twitter:creator" content="@ka1manov">
