@@ -4,17 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vector Search Internals: HNSW and IVF-PQ</title>
-<meta name="description" content="How approximate nearest-neighbour indexes actually work, the recall-latency-memory triangle, parameter tuning, and why filtered vector search is genuinely hard.">
+<meta name="description" content="How approximate nearest-neighbour indexes actually work, the recall-latency-memory triangle, parameter tuning against a measured target, and why filtered vector search is genuinely hard.">
 <link rel="canonical" href="https://ka1manov.github.io/ai-ml-handbook/articles/vector-search.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="The AI/ML Engineering Handbook">
-<meta property="og:title" content="Vector Search Internals: HNSW and IVF-PQ">
-<meta property="og:description" content="How approximate nearest-neighbour indexes actually work, the recall-latency-memory triangle, parameter tuning, and why filtered vector search is genuinely hard.">
+<meta property="og:title" content="Vector Search Internals — HNSW and IVF-PQ">
+<meta property="og:description" content="How approximate nearest-neighbour indexes actually work, the recall-latency-memory triangle, parameter tuning against a measured target, and why filtered vector search is genuinely hard.">
 <meta property="og:url" content="https://ka1manov.github.io/ai-ml-handbook/articles/vector-search.html">
 <meta property="og:image" content="https://ka1manov.github.io/ai-ml-handbook/assets/img/og-articles.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Vector Search Internals: HNSW and IVF-PQ — the AI/ML Engineering Handbook by @ka1manov">
+<meta property="og:image:alt" content="Vector Search Internals — HNSW and IVF-PQ — the AI/ML Engineering Handbook by @ka1manov">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@ka1manov">
 <meta name="twitter:creator" content="@ka1manov">
@@ -63,11 +63,277 @@
 </header>
 <main id="main">
 <div class="shell">
-<section class="pagehead">
-<h1>Vector Search Internals: HNSW and IVF-PQ</h1>
-<p class="lede">Being written.</p>
-<p class="meta">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">cat ~/articles/vector-search.md</p>
+  <h1>Vector search internals</h1>
+  <p class="lede">Most people using a vector database treat the index as a black box with a few knobs. The knobs are not arbitrary — each one moves a specific point on a three-way trade-off, and knowing the mechanism tells you which one to turn. This covers how the indexes actually work and how to tune them against a number rather than a feeling.</p>
+  <p class="meta"><span class="k">words</span> <span class="v">~3.1k</span><span class="sep">|</span><span class="k">read</span> <span class="v">~15m</span><span class="sep">|</span><span class="k">level</span> <span class="v">senior</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
 </section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#problem">The problem and why it is hard</a></li>
+      <li><a href="#flat">Flat: the honest baseline</a></li>
+      <li><a href="#ivf">IVF: partition the space</a></li>
+      <li><a href="#pq">Product quantisation</a></li>
+      <li><a href="#hnsw">HNSW: navigate a graph</a></li>
+      <li><a href="#tuning">Tuning against a measured target</a></li>
+      <li><a href="#filtered">Why filtered search is hard</a></li>
+      <li><a href="#choosing">Choosing an index</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<section class="section" id="problem">
+  <div class="prose">
+    <h2>The problem and why it is hard</h2>
+
+    <p>Given a query vector, find the k nearest vectors among millions. Exact search is trivial to write and linear in corpus size, which stops being acceptable somewhere around a few hundred thousand vectors under a real latency budget.</p>
+
+    <p>The reason you cannot simply use a tree — as you would for one-dimensional or low-dimensional data — is the curse of dimensionality. In high dimensions, space-partitioning structures degrade until they examine nearly everything, and distances between points concentrate: the ratio between the nearest and farthest neighbour approaches 1, so "nearest" becomes barely distinguishable from "average."</p>
+
+    <p>The reason vector search works anyway is that real embeddings do not fill their nominal space. They lie on a much lower-dimensional manifold, and the quantity that governs how hard your search is is that <b>intrinsic dimensionality</b> — a property of your corpus and your embedding model, not of the index.</p>
+
+    <p>This is why recall numbers do not transfer between systems. Two deployments with identical index parameters can differ by many recall points on different corpora, and any figure quoted without the corpus attached is close to meaningless.</p>
+
+    <p>So approximate nearest neighbour search gives up exactness for speed, and the entire discipline is choosing where on that trade-off to sit — deliberately, with a measurement.</p>
+  </div>
+</section>
+
+<section class="section" id="flat">
+  <div class="prose">
+    <h2>Flat: the honest baseline</h2>
+
+    <p>Compare the query against every vector. For normalised vectors this is one matrix multiply, which modern hardware does extremely well.</p>
+
+<pre><code>scores = matrix @ query        <span class="c-com"># [n, d] @ [d] -> [n]</span>
+top_k  = argpartition(-scores, k)[:k]
+</code></pre>
+
+    <p>Perfect recall by construction, no build step, no parameters, no staleness. Perfectly adequate up to a few hundred thousand vectors, and people abandon it far earlier than they need to.</p>
+
+    <p><b>Keep a flat index over a sample even after you move on.</b> It is your ground truth. Measuring the recall of an approximate index requires knowing the exact answer, and a flat index over 50,000 sampled vectors gives you that for almost nothing. Without it, every recall claim you make is a guess.</p>
+  </div>
+</section>
+
+<section class="section" id="ivf">
+  <div class="prose">
+    <h2>IVF: partition the space</h2>
+
+    <p>Inverted file indexing clusters the vectors — typically with k-means — and assigns each to its nearest centroid. At query time, find the closest few centroids and search only within those partitions.</p>
+
+<pre><code><span class="c-com"># build: cluster into nlist partitions (needs a training sample)</span>
+centroids = kmeans(sample, nlist=<span class="c-num">4096</span>)
+<span class="c-kw">for</span> v <span class="c-kw">in</span> vectors:
+    lists[nearest(centroids, v)].append(v)
+
+<span class="c-com"># query: search only the nprobe nearest partitions</span>
+candidates = concat(lists[c] <span class="c-kw">for</span> c <span class="c-kw">in</span> nearest_n(centroids, q, nprobe))
+<span class="c-kw">return</span> top_k(candidates, q)
+
+<span class="c-com"># nprobe = nlist  is exact search with extra steps.
+# nprobe = 1      is fast and misses a lot.</span>
+</code></pre>
+
+    <p><code>nprobe</code> is the recall dial and it is adjustable at query time without rebuilding, which is genuinely useful — you can raise it for a high-stakes query path and lower it for a cheap one.</p>
+
+    <p>The characteristic failure mode is a boundary effect: a query near the edge of a partition has true neighbours sitting in the adjacent one, and with a low <code>nprobe</code> you never look there. This is why recall improves so sharply over the first few increments of <code>nprobe</code> and then flattens.</p>
+
+    <p>IVF needs a training step over a representative sample, which means it does not handle a corpus whose distribution shifts substantially over time without periodic retraining. Vectors added after training are assigned to existing centroids, and if the new data occupies a different region the partitions become badly unbalanced.</p>
+  </div>
+</section>
+
+<section class="section" id="pq">
+  <div class="prose">
+    <h2>Product quantisation</h2>
+
+    <p>IVF reduces how many vectors you compare against. Product quantisation reduces the cost of each comparison and, more importantly, how much memory the vectors occupy.</p>
+
+    <p>Split each vector into m sub-vectors. Cluster each sub-space independently into 256 centroids. Store each sub-vector as the single byte identifying its nearest centroid.</p>
+
+<pre><code><span class="c-com"># 768-dim float32 vector = 3,072 bytes
+# split into m = 96 sub-vectors of 8 dimensions each
+# store 96 centroid ids, one byte each = 96 bytes
+#
+# 32x compression.</span>
+
+<span class="c-com"># Distances are computed from a precomputed lookup table:
+# for each sub-space, the distance from the query's sub-vector
+# to all 256 centroids. Then a distance is 96 table lookups
+# and an addition — no multiplication at all.</span>
+</code></pre>
+
+    <p>The compression is what makes billion-scale search possible on hardware you can afford: 32× fewer bytes means 32× more vectors resident in memory, and memory residency is the difference between microseconds and milliseconds.</p>
+
+    <p>The cost is precision. You are no longer comparing against the vectors, you are comparing against their compressed approximations, and the error is real. The standard mitigation is <b>rescoring</b>: use the compressed index to retrieve a generous candidate set, then re-rank those candidates with the full-precision vectors fetched from disk or a separate store. You get most of the memory saving and most of the accuracy, at the cost of one extra fetch.</p>
+
+    <p>IVF-PQ combines both: partition to narrow the search, compress to make each comparison cheap. It is the standard answer at very large scale and overkill below it.</p>
+  </div>
+</section>
+
+<section class="section" id="hnsw">
+  <div class="prose">
+    <h2>HNSW: navigate a graph</h2>
+
+    <p>Hierarchical navigable small world is the default for most production systems under roughly fifty million vectors, and its structure is worth understanding because its parameters follow directly from it.</p>
+
+    <p>Build a graph where each vector is a node connected to its approximate neighbours. Searching means starting somewhere and greedily walking toward the query. The problem with a single such graph is that a greedy walk from a random start takes many hops to cross the space.</p>
+
+    <p>The hierarchy fixes that. Nodes are assigned to layers with exponentially decreasing probability, so the top layer is sparse with long-range links and the bottom layer contains everything with short-range links. A search enters at the top, greedily descends toward the query, drops a layer, and repeats — coarse navigation first, fine refinement last.</p>
+  </div>
+
+  <figure class="fig">
+    <svg viewBox="0 0 860 330" role="img" aria-label="Diagram of an HNSW index. Layer two is sparse with a few nodes and long-range links for coarse navigation. Layer one is denser. Layer zero contains every vector with short-range links. A search enters at the top layer, greedily walks toward the query, then descends to the next layer and repeats, refining the result at each level.">
+      <text class="dg-text--accent" x="12" y="26">layer 2 — sparse, long links, coarse navigation</text>
+      <line class="dg-line" x1="12" y1="34" x2="848" y2="34" stroke-dasharray="3 4"/>
+      <circle class="dg-box--accent" cx="120" cy="66" r="7"/>
+      <circle class="dg-box" cx="400" cy="72" r="7"/>
+      <circle class="dg-box" cx="690" cy="62" r="7"/>
+      <path class="dg-line--accent" d="M127 67 H393"/>
+      <path class="dg-line" d="M407 71 H683"/>
+      <text class="dg-text--dim" x="106" y="52">entry</text>
+
+      <text class="dg-text--accent" x="12" y="126">layer 1 — denser</text>
+      <line class="dg-line" x1="12" y1="134" x2="848" y2="134" stroke-dasharray="3 4"/>
+      <circle class="dg-box" cx="120" cy="166" r="6"/>
+      <circle class="dg-box" cx="250" cy="172" r="6"/>
+      <circle class="dg-box--accent" cx="400" cy="162" r="6"/>
+      <circle class="dg-box" cx="540" cy="174" r="6"/>
+      <circle class="dg-box" cx="690" cy="166" r="6"/>
+      <path class="dg-line" d="M126 167 H244"/><path class="dg-line" d="M256 170 H394"/>
+      <path class="dg-line--accent" d="M406 163 H534"/><path class="dg-line" d="M546 172 H684"/>
+
+      <text class="dg-text--accent" x="12" y="226">layer 0 — every vector, short links</text>
+      <line class="dg-line" x1="12" y1="234" x2="848" y2="234" stroke-dasharray="3 4"/>
+      <circle class="dg-box" cx="80" cy="266" r="5"/><circle class="dg-box" cx="150" cy="272" r="5"/>
+      <circle class="dg-box" cx="220" cy="264" r="5"/><circle class="dg-box" cx="290" cy="274" r="5"/>
+      <circle class="dg-box" cx="360" cy="266" r="5"/><circle class="dg-box--accent" cx="430" cy="270" r="5"/>
+      <circle class="dg-box--accent" cx="500" cy="264" r="5"/><circle class="dg-box" cx="570" cy="272" r="5"/>
+      <circle class="dg-box" cx="640" cy="266" r="5"/><circle class="dg-box" cx="710" cy="272" r="5"/>
+      <circle class="dg-box" cx="780" cy="264" r="5"/>
+      <path class="dg-line" d="M85 267 H145"/><path class="dg-line" d="M155 271 H215"/>
+      <path class="dg-line" d="M225 265 H285"/><path class="dg-line" d="M295 273 H355"/>
+      <path class="dg-line" d="M365 267 H425"/><path class="dg-line--accent" d="M435 269 H495"/>
+      <path class="dg-line" d="M505 265 H565"/><path class="dg-line" d="M575 271 H635"/>
+      <path class="dg-line" d="M645 267 H705"/><path class="dg-line" d="M715 271 H775"/>
+
+      <path class="dg-line--accent" d="M120 73 V160" stroke-dasharray="4 3"/><path class="dg-fill--accent" d="M116 154 l4 8 4 -8 z"/>
+      <path class="dg-line--accent" d="M400 169 V258" stroke-dasharray="4 3"/><path class="dg-fill--accent" d="M396 252 l4 8 4 -8 z"/>
+      <text class="dg-text--accent" x="440" y="308">the query lands here — found in ~log(n) hops, not n comparisons</text>
+    </svg>
+    <figcaption>M controls how many links each node gets, efConstruction how hard the builder searches when placing one, and efSearch how hard each query searches. Only the last is changeable without a rebuild.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <p><b><code>M</code></b> — connections per node. More links means more paths to the right answer and better recall, and a larger graph. Memory scales with it directly, and since the graph itself is often comparable in size to the vectors, this is the parameter that determines whether HNSW fits in memory at all. Production values typically sit between 16 and 64; beyond that you buy very little recall for a lot of memory.</p>
+
+    <p><b><code>efConstruction</code></b> — how many candidates the builder considers when linking a new node. Higher produces a better-connected graph and a slower build. It is a one-time cost, so err high: a build that takes twice as long and permanently improves recall is an obviously good trade.</p>
+
+    <p><b><code>efSearch</code></b> — how many candidates each query keeps in flight. This is the runtime recall/latency dial and the only one adjustable without rebuilding. It must be at least k, and raising it improves recall with diminishing returns and roughly linear latency cost.</p>
+
+    <p>HNSW's practical weaknesses are worth knowing: the graph is large, builds are slow, and <b>deletions are awkward</b>. Most implementations mark nodes as deleted rather than removing them, because removing a node from a graph means repairing the links of everything that pointed at it. Over time a high-churn index accumulates tombstones that consume memory and degrade traversal, and the fix is a periodic rebuild. If your corpus turns over rapidly, budget for that.</p>
+  </div>
+</section>
+
+<section class="section" id="tuning">
+  <div class="prose">
+    <h2>Tuning against a measured target</h2>
+
+    <p>The mistake is tuning by feel — raising <code>efSearch</code> until results "look good." Recall is measurable and the measurement is cheap.</p>
+
+<pre><code><span class="c-com"># 1. Ground truth from a flat index over a sample.</span>
+truth = {q: flat_search(q, k=<span class="c-num">10</span>) <span class="c-kw">for</span> q <span class="c-kw">in</span> real_queries}
+
+<span class="c-com"># 2. Sweep the runtime dial and measure both axes.</span>
+<span class="c-kw">for</span> ef <span class="c-kw">in</span> [<span class="c-num">16</span>, <span class="c-num">32</span>, <span class="c-num">64</span>, <span class="c-num">128</span>, <span class="c-num">256</span>, <span class="c-num">512</span>]:
+    index.set_ef(ef)
+    hits, t0 = <span class="c-num">0</span>, time.perf_counter()
+    <span class="c-kw">for</span> q <span class="c-kw">in</span> real_queries:
+        hits += len(set(index.search(q, <span class="c-num">10</span>)) &amp; set(truth[q]))
+    recall = hits / (<span class="c-num">10</span> * len(real_queries))
+    p50    = (time.perf_counter() - t0) / len(real_queries)
+    <span class="c-fn">print</span>(ef, <span class="c-fn">round</span>(recall, <span class="c-num">3</span>), <span class="c-fn">round</span>(p50 * <span class="c-num">1000</span>, <span class="c-num">2</span>))
+
+<span class="c-com"># The curve has a knee. Sit just past it — beyond that you
+# are paying linear latency for fractional recall.</span>
+</code></pre>
+
+    <p>Three things about this procedure matter.</p>
+
+    <p><b>Use real queries.</b> Random vectors from your corpus are not distributed like user queries, and they will give you a recall figure that does not hold in production. If your queries are embedded differently from your documents — as they are with asymmetric models — this matters a great deal.</p>
+
+    <p><b>Decide the recall target from the application.</b> A RAG system with a reranker over 50 candidates does not need recall@10 of 0.99, because the reranker will reorder anyway. A legal discovery system where a missed document is a liability might. Setting a target makes the tuning decidable.</p>
+
+    <p><b>Re-measure after any change to the embedding model, the chunking, or the corpus size.</b> Recall degrades as an index grows at fixed parameters, and that degradation is invisible without this measurement — it presents as "answers got worse" months later with no code change to blame.</p>
+  </div>
+</section>
+
+<section class="section" id="filtered">
+  <div class="prose">
+    <h2>Why filtered search is hard</h2>
+
+    <p>"Nearest neighbours, but only documents this user can see, from last year, in English" is the most common production requirement and the one that breaks ANN indexes. The difficulty is structural, not an implementation gap.</p>
+
+    <p><b>Post-filtering</b> — search, then discard results failing the predicate — fails when the filter is selective. If a user can see 1% of the corpus, the global top-100 may contain nothing they are permitted to see while relevant material sits at rank 400. The system returns an empty or thin result set and the model says it does not know. <b>It fails quietly</b>, which is what makes it dangerous: nothing errors, quality just degrades for a subset of users.</p>
+
+    <p><b>Pre-filtering</b> — restrict to the permitted set, then search — is correct but destroys the structure the index depends on. HNSW navigates by walking through neighbours; if most nodes are excluded the walk cannot find its way and recall collapses. IVF degrades similarly, since a partition may contain no permitted vectors at all.</p>
+
+    <p>What production systems actually do:</p>
+
+    <p><b>Partition by the filter.</b> If the predicate is coarse — per tenant, per workspace, per language — give each value its own index. The filter becomes routing and search is unfiltered within the partition. This is by far the most robust answer where it fits, and it has the additional property of making cross-partition leakage structurally impossible rather than a matter of getting every query right. It should be your first consideration, not your last.</p>
+
+    <p><b>Filtered traversal.</b> Modern implementations evaluate the predicate during graph traversal, traversing through excluded nodes for connectivity while only collecting permitted ones as results, and over-searching to compensate. Effective, with a latency cost that rises as the filter becomes more selective.</p>
+
+    <p><b>Adaptive strategy.</b> Estimate the filter's selectivity first, then choose: brute-force over the permitted set when it is small, filtered traversal in the middle, post-filtering when the filter barely excludes anything. This is what mature vector databases do internally, and it is why their filtered performance varies so much with selectivity.</p>
+
+    <div class="callout callout--warn">
+      <span class="callout__label">test the security boundary, do not reason about it</span>
+      <p>If your filter enforces access control, write an automated test that attempts retrieval as one tenant for a document owned only by another, and run it on every commit. A manual check verifies one moment in time; this is a class of bug that gets reintroduced by a well-meaning refactor, and its failure mode is a data breach that returns HTTP 200.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="choosing">
+  <div class="prose">
+    <h2>Choosing an index</h2>
+
+    <p>The decision is mostly determined by scale and by whether memory or recall is your binding constraint.</p>
+
+    <p><b>Under ~100k vectors:</b> flat. Exact, no parameters, no staleness, no surprises. People move off it far too early and inherit a tuning problem they did not have.</p>
+
+    <p><b>100k to ~10M:</b> HNSW, with <code>M</code> around 16–32 and <code>efConstruction</code> generous. Measure <code>efSearch</code> against a recall target. This covers the overwhelming majority of real applications.</p>
+
+    <p><b>10M to ~100M:</b> HNSW if the memory fits, which is a real question because the graph is large — compute it before committing. Otherwise IVF with scalar quantisation, or IVF-PQ with full-precision rescoring.</p>
+
+    <p><b>Beyond 100M:</b> IVF-PQ or a disk-based index designed for the regime. At this scale memory is the dominant cost of the entire system and the architecture is chosen around it.</p>
+
+    <p>Two orthogonal considerations that often decide it regardless of scale:</p>
+
+    <p><b>Update pattern.</b> High churn favours indexes that handle deletion gracefully, or a design where you rebuild partitions on a schedule. HNSW's tombstones make it a poor fit for a corpus that turns over weekly unless you plan the rebuilds.</p>
+
+    <p><b>Filtering.</b> If you have selective filters, this often matters more than raw scale, and partitioning by the filter may determine your layout before any of the above applies.</p>
+
+    <div class="callout callout--note">
+      <span class="callout__label">the compressed version</span>
+      <p>Keep a flat index over a sample as ground truth, forever. Measure recall with real queries rather than trusting any published number, because recall is a property of your corpus. Tune <code>efSearch</code> to a target you chose from the application. Re-measure whenever the corpus, the chunking or the embedding model changes. And if you have access-control filters, partition rather than filter, then test the boundary automatically.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing to buy.</b> A gift to my subscribers on X.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> for more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="../rag.html">RAG, properly</a></span><span class="sep">|</span><span class="v"><a href="inference.html">inference economics</a></span><span class="sep">|</span><span class="v"><a href="../interview.html">interview questions</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
 </div>
 </main>
 
@@ -113,6 +379,6 @@
 <script src="../assets/js/theme.js" defer></script>
 <script src="../assets/js/nav.js" defer></script>
 <script src="../assets/js/search.js" defer></script>
-<script src="../assets/js/progress.js" defer></script>
+<script src="../assets/js/rail.js" defer></script>
 </body>
 </html>
