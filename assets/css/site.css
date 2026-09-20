@@ -141,6 +141,9 @@ img { height: auto; }
   margin-inline: auto;
   padding-inline: clamp(16px, 4vw, 40px);
 }
+/* Only tables, diagrams and the rail use the extra room — .prose stays
+   pinned at its 66ch measure, so line length does not change. */
+@media (min-width: 1600px) { :root { --shell: 1320px; } }
 
 .prose { max-width: var(--measure); }
 .prose > * + * { margin-top: 1.1em; }
@@ -151,6 +154,24 @@ img { height: auto; }
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   background: var(--bg-raised);
+}
+/* Four or more prose columns cannot fit the reading measure without
+   wrapping to an unreadable width, so they scroll instead. */
+.scroll-x--wide table { min-width: 880px; }
+.scroll-x--wide::after {
+  content: "← scroll →";
+  display: block;
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-inset);
+  font-size: var(--micro);
+  color: var(--text-dim);
+  position: sticky;
+  left: 0;
+}
+@media (min-width: 1600px) {
+  /* The widened shell fits an 880px table whole; drop the affordance. */
+  .scroll-x--wide::after { display: none; }
 }
 
 .grid-2, .grid-3 { display: grid; gap: var(--sp-4); }

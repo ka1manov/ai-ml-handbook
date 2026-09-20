@@ -122,6 +122,18 @@ ${(m.scripts || '').split(',').filter(Boolean).map((s) => `<script src="${m.base
 `;
 }
 
+/* A four-column prose table wraps to ~24 characters per column inside the
+   reading measure, which is unreadable. Tag those so they scroll instead. */
+function markWideTables(html) {
+  return html.replace(/<div class="scroll-x"([^>]*)>([\s\S]*?)<\/table>/g, (m, attrs, inner) => {
+    const head = inner.match(/<thead>[\s\S]*?<\/thead>/);
+    const cols = head ? (head[0].match(/<th\b/g) || []).length : 0;
+    return cols >= 4
+      ? m.replace('class="scroll-x"', 'class="scroll-x scroll-x--wide"')
+      : m;
+  });
+}
+
 function build(file) {
   const raw = readFileSync(join(SRC, file), 'utf8');
   const split = raw.indexOf('\n---\n');
@@ -135,7 +147,7 @@ function build(file) {
   const body = raw.slice(split + 5);
   const out = join(ROOT, meta.path);
   mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, head(meta) + body.trimEnd() + '\n' + foot(meta));
+  writeFileSync(out, head(meta) + markWideTables(body.trimEnd()) + '\n' + foot(meta));
   return meta.path;
 }
 

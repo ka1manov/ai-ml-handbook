@@ -241,7 +241,7 @@
     <p>The tension is simple. Small chunks give precise retrieval and poor context: you find the right sentence but the model cannot see the qualifier in the paragraph before it. Large chunks give rich context and diluted embeddings: a 2,000-token chunk covering four topics has an embedding that sits somewhere between all four and is strongly similar to none of them.</p>
   </div>
 
-  <div class="scroll-x" style="margin-top:var(--sp-5)">
+  <div class="scroll-x scroll-x--wide" style="margin-top:var(--sp-5)">
     <table>
       <caption>Chunking strategies. There is no default that is right for every corpus — the right answer depends on how your documents are actually structured.</caption>
       <thead>
@@ -346,7 +346,7 @@
     <p>The trade-off is genuinely three-way, and you cannot optimise all three:</p>
   </div>
 
-  <div class="scroll-x" style="margin-top:var(--sp-5)">
+  <div class="scroll-x scroll-x--wide" style="margin-top:var(--sp-5)">
     <table>
       <caption>The recall–latency–memory triangle. Pick the two you care about; the third is what you pay.</caption>
       <thead>
@@ -599,7 +599,7 @@
     <p>Work it top to bottom. The stages are ordered so that an earlier failure makes every later measurement meaningless — there is no point debugging generation while retrieval is broken.</p>
   </div>
 
-  <div class="scroll-x" style="margin-top:var(--sp-5)">
+  <div class="scroll-x scroll-x--wide" style="margin-top:var(--sp-5)">
     <table>
       <caption>Symptom → cause → the diagnostic that distinguishes it → the fix. The diagnostic column is the part that matters: it is what tells you which cause you actually have.</caption>
       <thead>

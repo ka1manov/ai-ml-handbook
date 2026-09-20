@@ -188,7 +188,7 @@ step 900: [P Q R S T U V H]   <span class="c-com"># still full</span>
     <p>Store weights in fewer bits. Because decode is bandwidth-bound, halving the bytes per parameter roughly halves the time spent reading weights — so quantisation buys speed as well as memory, which is the part people underestimate.</p>
   </div>
 
-  <div class="scroll-x" style="margin-top:var(--sp-5)">
+  <div class="scroll-x scroll-x--wide" style="margin-top:var(--sp-5)">
     <table>
       <caption>Quantisation levels. Quality impact is task-dependent and must be measured on your own evaluation set — the general claim that "int8 is basically lossless" is true on average and not true for every task.</caption>
       <thead>
@@ -270,7 +270,7 @@ target verifies:  " the quick brown"  ✓✓✓   "fox" ✗
     <p>The table most serving discussions need and rarely have. Several of these trade against each other, and knowing which is which prevents a lot of wasted work.</p>
   </div>
 
-  <div class="scroll-x" style="margin-top:var(--sp-5)">
+  <div class="scroll-x scroll-x--wide" style="margin-top:var(--sp-5)">
     <table>
       <caption>Optimisations by what they actually improve. "↑" means improves, "↓" means worsens, "—" means roughly unaffected.</caption>
       <thead>
