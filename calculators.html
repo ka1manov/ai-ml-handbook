@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en" data-base="./">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI/ML Engineering Calculators</title>
+<meta name="description" content="Three working calculators for serving and retrieval decisions — GPU memory and KV cache, cost per successful outcome, and vector index memory. The same formulas the articles derive, made executable.">
+<link rel="canonical" href="https://ka1manov.github.io/ai-ml-handbook/calculators.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The AI/ML Engineering Handbook">
+<meta property="og:title" content="AI/ML Engineering Calculators">
+<meta property="og:description" content="Three working calculators for serving and retrieval decisions — GPU memory and KV cache, cost per successful outcome, and vector index memory. The same formulas the articles derive, made executable.">
+<meta property="og:url" content="https://ka1manov.github.io/ai-ml-handbook/calculators.html">
+<meta property="og:image" content="https://ka1manov.github.io/ai-ml-handbook/assets/img/og-calculators.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Terminal-style card reading "AI/ML Engineering Calculators". From the AI/ML Engineering Handbook by @ka1manov.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@ka1manov">
+<meta name="twitter:creator" content="@ka1manov">
+<meta name="twitter:image" content="https://ka1manov.github.io/ai-ml-handbook/assets/img/og-calculators.png">
+<meta name="author" content="@ka1manov">
+<meta name="theme-color" content="#0C0B08" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F2EEE3" media="(prefers-color-scheme: light)">
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('amh:theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'))}catch(e){document.documentElement.setAttribute('data-theme','dark')}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="./assets/css/site.css">
+<link rel="icon" href="./assets/img/favicon.svg" type="image/svg+xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"AI/ML Engineering Calculators","description":"Three working calculators for serving and retrieval decisions — GPU memory and KV cache, cost per successful outcome, and vector index memory. The same formulas the articles derive, made executable.","url":"https://ka1manov.github.io/ai-ml-handbook/calculators.html","image":"https://ka1manov.github.io/ai-ml-handbook/assets/img/og-calculators.png","inLanguage":"en","author":{"@type":"Person","name":"@ka1manov","url":"https://x.com/ka1manov"},"publisher":{"@type":"Person","name":"@ka1manov","url":"https://x.com/ka1manov"},"license":"https://creativecommons.org/licenses/by/4.0/","isAccessibleForFree":true,"dateModified":"2026-09-20"}</script>
+</head>
+<body>
+<a class="sr-only" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="shell topbar__inner">
+    <a class="topbar__brand" href="./index.html">~/<span class="topbar__brand-long">ai-ml-</span>handbook</a>
+    <span class="topbar__by">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span>
+    <nav class="topbar__links" aria-label="Sections">
+      <a href="./index.html">roadmap</a>
+      <a href="./rag.html">rag</a>
+      <a href="./interview.html">interview</a>
+      <a href="./startups.html">startups</a>
+      <a href="./calculators.html">calculators</a>
+      <a href="./tips.html">field-notes</a>
+      <a href="./articles/index.html">articles</a>
+    </nav>
+    <div class="topbar__tools">
+      <button class="btn" type="button" data-search-open aria-label="Search the handbook">[ / ]</button>
+      <button class="btn" type="button" data-theme-toggle>[ crt ]</button>
+      <button class="btn" type="button" data-nav-toggle>[ menu ]</button>
+    </div>
+  </div>
+  <div class="shell">
+    <nav class="navmenu" id="navmenu" aria-label="Sections, compact" hidden>
+      <a href="./index.html">roadmap</a>
+      <a href="./rag.html">rag</a>
+      <a href="./interview.html">interview</a>
+      <a href="./startups.html">startups</a>
+      <a href="./calculators.html">calculators</a>
+      <a href="./tips.html">field-notes</a>
+      <a href="./articles/index.html">articles</a>
+    </nav>
+  </div>
+</header>
+<main id="main">
+<div class="shell">
+
+<section class="pagehead" style="border-bottom:0">
+  <p class="prompt">./calc.sh</p>
+  <h1>Calculators</h1>
+  <p class="lede">The arithmetic from the articles, made executable. Every formula here is the one derived in the linked article — if they ever disagree, the article is the specification and this is the bug.</p>
+  <p class="meta"><span class="k">tools</span> <span class="v">3</span><span class="sep">|</span><span class="k">runs</span> <span class="v">in your browser, nothing sent anywhere</span><span class="sep">|</span><span class="k">by</span> <span class="v"><a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></span></p>
+</section>
+
+<div class="withaside">
+<aside class="withaside__nav">
+  <nav class="rail" data-rail aria-label="On this page">
+    <h2>contents</h2>
+    <ol>
+      <li><a href="#vram">GPU memory and KV cache</a></li>
+      <li><a href="#cost">Cost per successful outcome</a></li>
+      <li><a href="#index">Vector index memory</a></li>
+    </ol>
+  </nav>
+</aside>
+<div class="withaside__main">
+
+<!-- ============================ VRAM ============================ -->
+<section class="section" id="vram">
+  <div class="prose">
+    <h2>GPU memory and KV cache</h2>
+    <p>Memory, not compute, usually decides how many users you can serve. This works out whether a model fits, and what batch size you can actually run at a given context length — the number that becomes your throughput, and therefore your cost per request.</p>
+    <p class="meta"><span class="k">derived in</span> <span class="v"><a href="articles/inference.html#memory">inference economics</a></span><span class="sep">|</span><span class="v"><a href="articles/transformers.html#cache">the KV cache</a></span></p>
+  </div>
+
+  <div class="calc" data-calc="vram">
+    <div class="calc__panel">
+      <div class="calc__head"><span>parameters</span> <b>edit anything</b></div>
+      <div class="calc__body">
+
+        <div class="calc__field">
+          <label class="calc__label" for="v-preset">typical configuration <span class="hint">— sets the four fields below</span></label>
+          <select id="v-preset" data-in="preset">
+            <option value="8b-gqa">~8B, grouped-query attention</option>
+            <option value="7b-mha">~7B, multi-head attention</option>
+            <option value="13b-mha">~13B, multi-head attention</option>
+            <option value="34b-gqa">~34B, grouped-query attention</option>
+            <option value="70b-gqa">~70B, grouped-query attention</option>
+          </select>
+        </div>
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="v-params">parameters <span class="hint">— billions</span></label>
+            <input id="v-params" type="number" data-in="params" value="8" min="0.1" step="0.1">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="v-layers">layers</label>
+            <input id="v-layers" type="number" data-in="layers" value="32" min="1" step="1">
+          </div>
+        </div>
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="v-kvheads">KV heads <span class="hint">— fewer = smaller cache</span></label>
+            <input id="v-kvheads" type="number" data-in="kvheads" value="8" min="1" step="1">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="v-headdim">head dimension</label>
+            <input id="v-headdim" type="number" data-in="headdim" value="128" min="1" step="1">
+          </div>
+        </div>
+
+        <div class="calc__field">
+          <span class="calc__label" id="v-prec-label">weight precision</span>
+          <div class="seg" data-seg="precision" role="group" aria-labelledby="v-prec-label">
+            <button type="button" data-value="fp16" aria-pressed="true">fp16</button>
+            <button type="button" data-value="int8" aria-pressed="false">int8</button>
+            <button type="button" data-value="int4" aria-pressed="false">int4</button>
+          </div>
+        </div>
+
+        <div class="calc__field">
+          <span class="calc__label" id="v-kvprec-label">KV cache precision</span>
+          <div class="seg" data-seg="kvprecision" role="group" aria-labelledby="v-kvprec-label">
+            <button type="button" data-value="fp16" aria-pressed="true">fp16</button>
+            <button type="button" data-value="int8" aria-pressed="false">int8</button>
+          </div>
+        </div>
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="v-ctx">context length <span class="hint">— tokens</span></label>
+            <input id="v-ctx" type="number" data-in="ctx" value="8192" min="128" step="128">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="v-batch">concurrent sequences</label>
+            <input id="v-batch" type="number" data-in="batch" value="16" min="1" step="1">
+          </div>
+        </div>
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="v-vram">GPU memory <span class="hint">— GiB, total</span></label>
+            <input id="v-vram" type="number" data-in="vram" value="80" min="1" step="1">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="v-overhead">overhead <span class="hint">— % for activations, fragmentation</span></label>
+            <input id="v-overhead" type="number" data-in="overhead" value="15" min="0" max="100" step="1">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="calc__panel">
+      <div class="calc__head"><span>memory budget</span> <b>live</b></div>
+      <div class="calc__body">
+        <div class="out" aria-live="polite">
+          <div class="out__row"><span class="out__k">weights</span><span class="out__v" data-out="weights">—</span></div>
+          <div class="out__row"><span class="out__k">KV cache, per sequence</span><span class="out__v" data-out="kvper">—</span></div>
+          <div class="out__row"><span class="out__k">KV cache, all sequences</span><span class="out__v" data-out="kvtotal">—</span></div>
+          <div class="out__row"><span class="out__k">overhead</span><span class="out__v" data-out="overhead">—</span></div>
+          <div class="out__row out__row--total"><span class="out__k">total required</span><span class="out__v" data-out="total">—</span></div>
+          <div class="out__row"><span class="out__k">fits in budget?</span><span class="out__v" data-out="fits">—</span></div>
+          <div class="out__row"><span class="out__k">max concurrent sequences</span><span class="out__v" data-out="maxbatch">—</span></div>
+          <div class="out__row"><span class="out__k">cache as share of total</span><span class="out__v" data-out="kvshare">—</span></div>
+        </div>
+        <p class="out__note">Try it: drop KV heads from 32 to 8 and watch the cache collapse — that is the entire argument for grouped-query attention. Then double the context and watch your maximum batch halve, which is why long context is a throughput decision and not only a capability one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ COST ============================ -->
+<section class="section" id="cost">
+  <div class="prose">
+    <h2>Cost per successful outcome</h2>
+    <p>Cost per request is the number that governs nothing. Cost per <i>successful outcome</i> is the one that governs the business, because a cheaper model that fails more often and triggers retries costs more overall — and only this denominator shows it.</p>
+    <p class="meta"><span class="k">derived in</span> <span class="v"><a href="startups.html#economics">unit economics</a></span><span class="sep">|</span><span class="v"><a href="rag.html#production">RAG cost model</a></span></p>
+  </div>
+
+  <div class="calc" data-calc="cost">
+    <div class="calc__panel">
+      <div class="calc__head"><span>your numbers</span> <b>prices change — use today's</b></div>
+      <div class="calc__body">
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="c-tin">input tokens per call <span class="hint">— prompt + context</span></label>
+            <input id="c-tin" type="number" data-in="tin" value="2400" min="0" step="100">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="c-tout">output tokens per call</label>
+            <input id="c-tout" type="number" data-in="tout" value="300" min="0" step="50">
+          </div>
+        </div>
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="c-pin">input price <span class="hint">— per 1M tokens</span></label>
+            <input id="c-pin" type="number" data-in="pin" value="3" min="0" step="0.01">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="c-pout">output price <span class="hint">— per 1M tokens</span></label>
+            <input id="c-pout" type="number" data-in="pout" value="15" min="0" step="0.01">
+          </div>
+        </div>
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="c-success">success rate <span class="hint">— % of calls that produce a usable result</span></label>
+            <input id="c-success" type="number" data-in="success" value="85" min="1" max="100" step="1">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="c-retries">retry rate <span class="hint">— % of calls retried</span></label>
+            <input id="c-retries" type="number" data-in="retries" value="10" min="0" max="500" step="1">
+          </div>
+        </div>
+
+        <div class="calc__field">
+          <label class="calc__label" for="c-volume">successful outcomes per month</label>
+          <input id="c-volume" type="number" data-in="volume" value="100000" min="1" step="1000">
+        </div>
+
+      </div>
+    </div>
+
+    <div class="calc__panel">
+      <div class="calc__head"><span>what it costs</span> <b>live</b></div>
+      <div class="calc__body">
+        <div class="out" aria-live="polite">
+          <div class="out__row"><span class="out__k">cost per call</span><span class="out__v" data-out="percall">—</span></div>
+          <div class="out__row"><span class="out__k">input share of that</span><span class="out__v" data-out="inshare">—</span></div>
+          <div class="out__row"><span class="out__k">calls per successful outcome</span><span class="out__v" data-out="calls">—</span></div>
+          <div class="out__row out__row--total"><span class="out__k">cost per successful outcome</span><span class="out__v" data-out="peroutcome">—</span></div>
+          <div class="out__row"><span class="out__k">per month</span><span class="out__v" data-out="monthly">—</span></div>
+          <div class="out__row"><span class="out__k">per year</span><span class="out__v" data-out="annual">—</span></div>
+        </div>
+
+        <div class="share" data-share aria-hidden="true"><i style="width:50%"></i><i style="width:50%"></i></div>
+        <div class="share-key"><span><i class="a"></i><b>input tokens</b></span><span><i class="b"></i><b>output tokens</b></span></div>
+
+        <p class="out__note">Try it: drop success from 85% to 60% without changing anything else. That is why quality <i>is</i> cost. Then cut input tokens in half — if your retrieval recall holds at five chunks instead of ten, that is free money.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ INDEX ============================ -->
+<section class="section" id="index">
+  <div class="prose">
+    <h2>Vector index memory</h2>
+    <p>At scale, memory is the dominant cost of a retrieval system, and the HNSW graph is frequently as large as the vectors it indexes. This sizes the index and shows what quantisation actually buys.</p>
+    <p class="meta"><span class="k">derived in</span> <span class="v"><a href="articles/vector-search.html">vector search internals</a></span><span class="sep">|</span><span class="v"><a href="rag.html#indexes">the recall triangle</a></span></p>
+  </div>
+
+  <div class="calc" data-calc="index">
+    <div class="calc__panel">
+      <div class="calc__head"><span>corpus and index</span> <b>edit anything</b></div>
+      <div class="calc__body">
+
+        <div class="calc__row calc__row--2">
+          <div class="calc__field">
+            <label class="calc__label" for="i-vectors">vectors <span class="hint">— millions</span></label>
+            <input id="i-vectors" type="number" data-in="vectors" value="10" min="0.001" step="1">
+          </div>
+          <div class="calc__field">
+            <label class="calc__label" for="i-dims">dimensions</label>
+            <input id="i-dims" type="number" data-in="dims" value="768" min="1" step="1">
+          </div>
+        </div>
+
+        <div class="calc__field">
+          <span class="calc__label" id="i-quant-label">stored precision</span>
+          <div class="seg" data-seg="quant" role="group" aria-labelledby="i-quant-label">
+            <button type="button" data-value="fp32" aria-pressed="true">fp32</button>
+            <button type="button" data-value="fp16" aria-pressed="false">fp16</button>
+            <button type="button" data-value="int8" aria-pressed="false">int8</button>
+            <button type="button" data-value="binary" aria-pressed="false">binary</button>
+          </div>
+        </div>
+
+        <div class="calc__field">
+          <span class="calc__label" id="i-index-label">index type</span>
+          <div class="seg" data-seg="index" role="group" aria-labelledby="i-index-label">
+            <button type="button" data-value="hnsw" aria-pressed="true">HNSW</button>
+            <button type="button" data-value="flat" aria-pressed="false">flat</button>
+          </div>
+        </div>
+
+        <div class="calc__field">
+          <label class="calc__label" for="i-m">HNSW M <span class="hint">— links per node; more = better recall, larger graph</span></label>
+          <input id="i-m" type="number" data-in="m" value="16" min="2" max="128" step="2">
+        </div>
+
+        <div class="calc__field">
+          <span class="calc__label" id="i-rescore-label">keep full-precision copy for rescoring</span>
+          <div class="seg" data-seg="rescore" role="group" aria-labelledby="i-rescore-label">
+            <button type="button" data-value="no" aria-pressed="true">no</button>
+            <button type="button" data-value="yes" aria-pressed="false">yes</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="calc__panel">
+      <div class="calc__head"><span>index size</span> <b>live</b></div>
+      <div class="calc__body">
+        <div class="out" aria-live="polite">
+          <div class="out__row"><span class="out__k">vectors</span><span class="out__v" data-out="vectors">—</span></div>
+          <div class="out__row"><span class="out__k">HNSW graph</span><span class="out__v" data-out="graph">—</span></div>
+          <div class="out__row"><span class="out__k">rescoring copy</span><span class="out__v" data-out="rescore">—</span></div>
+          <div class="out__row out__row--total"><span class="out__k">total resident</span><span class="out__v" data-out="total">—</span></div>
+          <div class="out__row"><span class="out__k">bytes per vector</span><span class="out__v" data-out="perv">—</span></div>
+          <div class="out__row"><span class="out__k">vs fp32 HNSW</span><span class="out__v" data-out="vsfp32">—</span></div>
+        </div>
+        <p class="out__note">Try it: switch fp32 to int8 at 10M vectors. Then notice the graph does not shrink at all — it stores neighbour ids, not vectors, which is why quantisation stops helping once the graph dominates. Raising M makes that worse.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <div class="callout callout--warn">
+      <span class="callout__label">what these do not tell you</span>
+      <p>All three are sizing and cost models, not performance predictions. They cannot tell you your recall, which depends on the intrinsic dimensionality of your own embeddings; your tokens per request, which depends on your prompts and retrieval; or your success rate, which depends on your evaluation set. Those come from measurement.</p>
+      <p>Use these to decide what to build and what to budget. Use <a href="articles/evaluation.html">an evaluation suite</a> to find out whether it works.</p>
+    </div>
+  </div>
+
+  <div class="follow">
+    <p><b>Free, no signup, nothing sent anywhere.</b> Every calculation runs in your browser.</p>
+    <p>Follow <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> on X for more of this.</p>
+    <p class="meta" style="margin-top:var(--sp-4)"><span class="k">next</span> <span class="v"><a href="articles/inference.html">inference economics</a></span><span class="sep">|</span><span class="v"><a href="articles/vector-search.html">vector search internals</a></span><span class="sep">|</span><span class="v"><a href="startups.html#economics">unit economics</a></span></p>
+  </div>
+</section>
+
+</div>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">
+  <div class="shell footer__grid">
+    <div>
+      <h2>about</h2>
+      <p>The AI/ML Engineering Handbook. Written for people who ship systems, not notebooks.</p>
+      <p style="margin-top:var(--sp-3)">A gift to my subscribers on X. Free, no signup, no tracking, no ads.</p>
+      <p style="margin-top:var(--sp-3)">by <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a></p>
+    </div>
+    <div>
+      <h2>contents</h2>
+      <ul>
+        <li><a href="./index.html">roadmap</a></li>
+        <li><a href="./rag.html">rag</a></li>
+        <li><a href="./interview.html">interview</a></li>
+        <li><a href="./startups.html">startups</a></li>
+        <li><a href="./calculators.html">calculators</a></li>
+        <li><a href="./tips.html">field-notes</a></li>
+        <li><a href="./articles/index.html">articles</a></li>
+      </ul>
+    </div>
+    <div>
+      <h2>this page</h2>
+      <ul>
+        <li><a href="https://x.com/ka1manov" rel="noopener" target="_blank">follow on X</a></li>
+        <li><a href="./index.html#how-to-use">how to use this</a></li>
+        <li><a href="https://github.com/ka1manov/ai-ml-handbook" rel="noopener" target="_blank">source on GitHub</a></li>
+        <li><span class="meta">updated 2026-09-20<br>prose CC BY 4.0 · code MIT</span></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<div class="search" id="search" role="dialog" aria-modal="true" aria-label="Search the handbook" hidden>
+  <div class="search__panel">
+    <input class="search__input" type="search" placeholder="search the handbook…" aria-label="Search query" autocomplete="off" spellcheck="false">
+    <ul class="search__results" role="listbox" aria-label="Search results"></ul>
+    <p class="search__empty" hidden>No matches.</p>
+    <p class="search__foot"><span class="kbd">↑</span> <span class="kbd">↓</span> to move · <span class="kbd">enter</span> to open · <span class="kbd">esc</span> to close</p>
+  </div>
+</div>
+
+<script src="./assets/js/theme.js" defer></script>
+<script src="./assets/js/nav.js" defer></script>
+<script src="./assets/js/search.js" defer></script>
+<script src="./assets/js/calc.js" defer></script>
+<script src="./assets/js/rail.js" defer></script>
+</body>
+</html>

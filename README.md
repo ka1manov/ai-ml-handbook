@@ -20,6 +20,7 @@ by [@ka1manov](https://x.com/ka1manov)
 | **[RAG deep dive](https://ka1manov.github.io/ai-ml-handbook/rag.html)** | 7420 words | The full pipeline, plus a failure-mode taxonomy: symptom → cause → the diagnostic that distinguishes it → the fix. |
 | **[Interview bank](https://ka1manov.github.io/ai-ml-handbook/interview.html)** | 122 questions | Eight tracks with real answers, and what a weak answer sounds like next to a strong one. Filter, shuffle, drill. |
 | **[Startup playbook](https://ka1manov.github.io/ai-ml-handbook/startups.html)** | 3972 words | Build/buy/fine-tune, unit economics with the arithmetic shown, and why "we use an LLM" is not a moat. |
+| **[Calculators](https://ka1manov.github.io/ai-ml-handbook/calculators.html)** | 3 tools | GPU memory & KV cache · cost per successful outcome · vector index sizing. The formulas the articles derive, made executable. Runs entirely in your browser. |
 | **[Field notes](https://ka1manov.github.io/ai-ml-handbook/tips.html)** | 50 notes | The things that only show up after you've shipped something and watched it break. |
 | **[Long reads](https://ka1manov.github.io/ai-ml-handbook/articles/)** | 6 articles | Transformer internals · inference economics · fine-tuning decisions · evaluation engineering · vector search internals · agent architectures. |
 
@@ -30,6 +31,7 @@ by [@ka1manov](https://x.com/ka1manov)
 - **Progress tracking** — tick roadmap nodes, saved in your browser only
 - **Search** — press <kbd>/</kbd> or <kbd>⌘K</kbd>, instant, over every page, question and note
 - **Drill mode** — collapse answers, filter by track and level, shuffle, mark known
+- **Calculators** — live GPU memory, cost and index-sizing tools, nothing sent anywhere
 - **Two themes** — amber-phosphor CRT (default) and line-printer paper
 - Works on a phone, works with a keyboard, works with a screen reader
 
@@ -88,6 +90,7 @@ still works**.
 | `node tools/verify.mjs` | Structural gate: headings, social meta, a11y, broken links, design-system rules |
 | `node tools/build-pages.mjs` | Rebuilds the HTML from `src/*.part` so the shared chrome can't drift |
 | `node tools/build-index.mjs` | Regenerates the search index |
+| `node tools/build-seo.mjs` | Regenerates sitemap.xml and robots.txt |
 | `node tools/contrast.mjs` | WCAG contrast gate over the palette, both themes |
 | `node tools/check-svg-labels.mjs` | Flags SVG labels that would overlap when rendered |
 | `python3 tools/build-interview.py` | Renders the question bank from JSON |
@@ -97,7 +100,7 @@ still works**.
 Edit `src/<page>.part`, then:
 
 ```bash
-node tools/build-pages.mjs && node tools/build-index.mjs && node tools/verify.mjs
+node tools/build-pages.mjs && node tools/build-index.mjs && node tools/build-seo.mjs && node tools/verify.mjs
 ```
 
 Don't edit the root `.html` files directly — they're generated and your changes

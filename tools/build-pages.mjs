@@ -6,6 +6,14 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
+
+/* Date of the last commit, so "updated" reflects content rather than
+   the moment someone happened to run the build. */
+let UPDATED = new Date().toISOString().slice(0, 10);
+try {
+  UPDATED = execSync('git log -1 --format=%cs', { encoding: 'utf8' }).trim() || UPDATED;
+} catch { /* not a git checkout; fall back to today */ }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'src');
@@ -16,6 +24,7 @@ const NAV = [
   ['rag.html', 'rag'],
   ['interview.html', 'interview'],
   ['startups.html', 'startups'],
+  ['calculators.html', 'calculators'],
   ['tips.html', 'field-notes'],
   ['articles/index.html', 'articles'],
 ];
@@ -28,6 +37,28 @@ function alt(m) {
   return owned
     ? `Terminal-style card reading "${t}", by @ka1manov.`
     : `Terminal-style card reading "${t}". From the AI/ML Engineering Handbook by @ka1manov.`;
+}
+
+function schema(m) {
+  const url = BASE_URL + (m.path === 'index.html' ? '' : m.path);
+  const author = { '@type': 'Person', name: '@ka1manov', url: 'https://x.com/ka1manov' };
+  const base = {
+    '@context': 'https://schema.org',
+    '@type': m.ogtype === 'article' ? 'TechArticle' : 'WebSite',
+    name: m.ogtitle || m.title,
+    headline: m.ogtitle || m.title,
+    description: m.desc,
+    url,
+    image: `${BASE_URL}assets/img/${m.og}`,
+    inLanguage: 'en',
+    author,
+    publisher: author,
+    license: 'https://creativecommons.org/licenses/by/4.0/',
+    isAccessibleForFree: true,
+    dateModified: UPDATED,
+  };
+  if (m.ogtype !== 'article') delete base.headline;
+  return base;
 }
 
 function head(m) {
@@ -62,6 +93,7 @@ function head(m) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <link rel="stylesheet" href="${m.base}assets/css/site.css">
 <link rel="icon" href="${m.base}assets/img/favicon.svg" type="image/svg+xml">
+<script type="application/ld+json">${JSON.stringify(schema(m))}</script>
 </head>
 <body>
 <a class="sr-only" href="#main">Skip to content</a>
@@ -108,7 +140,8 @@ ${NAV.map(([h, l]) => `        <li><a href="${m.base}${h}">${l}</a></li>`).join(
       <ul>
         <li><a href="https://x.com/ka1manov" rel="noopener" target="_blank">follow on X</a></li>
         <li><a href="${m.base}index.html#how-to-use">how to use this</a></li>
-        <li><span class="meta">prose CC BY 4.0<br>code MIT</span></li>
+        <li><a href="https://github.com/ka1manov/ai-ml-handbook" rel="noopener" target="_blank">source on GitHub</a></li>
+        <li><span class="meta">updated ${UPDATED}<br>prose CC BY 4.0 · code MIT</span></li>
       </ul>
     </div>
   </div>

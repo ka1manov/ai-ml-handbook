@@ -1,0 +1,57 @@
+path: 404.html
+title: 404 — Page Not Found
+ogtitle: 404 — Not Found
+desc: That page does not exist in the AI/ML Engineering Handbook. Here is everything that does.
+og: og-default.png
+---
+<main id="main">
+<div class="shell">
+
+<section class="win" style="margin-top:var(--sp-7)">
+  <div class="win__bar">
+    <span class="win__dots">[_][□][X]</span>
+    <span class="win__title">ka1manov@handbook: ~/ai-ml-handbook</span>
+  </div>
+  <div class="win__body">
+    <p class="prompt">cat <span id="wanted">the-page-you-wanted</span></p>
+    <div class="log">
+      <div class="log__row"><span class="log__t">[00:00:00]</span><span class="log__lvl log__lvl--warn">err</span><span class="log__msg">No such file or directory<span class="cursor" aria-hidden="true"></span></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="pagehead" style="border-bottom:0">
+  <h1>That page does not exist</h1>
+  <p class="lede">Either the link is wrong, or I moved something and did not redirect it. Here is everything that does exist.</p>
+</section>
+
+<section class="section" style="padding-top:var(--sp-5)">
+  <ul class="tree" style="max-width:var(--measure)">
+    <li class="tree__item"><span class="tree__pre">├──</span><a href="index.html">index.html</a><span class="tree__note">roadmap, 42 nodes</span></li>
+    <li class="tree__item"><span class="tree__pre">├──</span><a href="rag.html">rag.html</a><span class="tree__note">the RAG deep dive</span></li>
+    <li class="tree__item"><span class="tree__pre">├──</span><a href="interview.html">interview.html</a><span class="tree__note">122 questions</span></li>
+    <li class="tree__item"><span class="tree__pre">├──</span><a href="startups.html">startups.html</a><span class="tree__note">the startup playbook</span></li>
+    <li class="tree__item"><span class="tree__pre">├──</span><a href="calculators.html">calculators.html</a><span class="tree__note">3 working tools</span></li>
+    <li class="tree__item"><span class="tree__pre">├──</span><a href="tips.html">tips.html</a><span class="tree__note">50 field notes</span></li>
+    <li class="tree__item"><span class="tree__pre">└──</span><a href="articles/index.html">articles/</a><span class="tree__note">6 long reads</span></li>
+  </ul>
+
+  <p class="meta" style="margin-top:var(--sp-6)">Or press <span class="kbd">/</span> to search everything.</p>
+
+  <div class="follow">
+    <p><b>Think this is a broken link on my side?</b> It might be.</p>
+    <p><a href="https://github.com/ka1manov/ai-ml-handbook/issues" rel="noopener" target="_blank">Open an issue</a> or tell <a href="https://x.com/ka1manov" rel="me noopener" target="_blank">@ka1manov</a> on X, and I will fix it.</p>
+  </div>
+</section>
+
+<script>
+  // Show what was actually requested — GitHub Pages serves 404.html
+  // for any missing path without changing the URL.
+  try {
+    var p = location.pathname.replace(/^\/ai-ml-handbook/, '') || '/';
+    if (p !== '/') document.getElementById('wanted').textContent = p.replace(/^\//, '');
+  } catch (e) { /* leave the placeholder */ }
+</script>
+
+</div>
+</main>

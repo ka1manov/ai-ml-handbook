@@ -1,0 +1,5 @@
+# The AI/ML Engineering Handbook — free to read, free to index.
+User-agent: *
+Allow: /
+
+Sitemap: https://ka1manov.github.io/ai-ml-handbook/sitemap.xml
